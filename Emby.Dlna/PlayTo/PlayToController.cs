@@ -318,8 +318,7 @@ namespace Emby.Dlna.PlayTo
 
                 CanSeek = info.MediaSource == null ? _device.Duration.HasValue : info.MediaSource.RunTimeTicks.HasValue,
 
-                PlayMethod = info.IsDirectStream ? PlayMethod.DirectStream : PlayMethod.Transcode,
-                QueueableMediaTypes = new List<string> { mediaInfo.MediaType }
+                PlayMethod = info.IsDirectStream ? PlayMethod.DirectStream : PlayMethod.Transcode
             };
         }
 
@@ -504,7 +503,7 @@ namespace Emby.Dlna.PlayTo
 
             var hasMediaSources = item as IHasMediaSources;
             var mediaSources = hasMediaSources != null
-                ? (_mediaSourceManager.GetStaticMediaSources(hasMediaSources, true, user)).ToList()
+                ? (_mediaSourceManager.GetStaticMediaSources(hasMediaSources, true, user))
                 : new List<MediaSourceInfo>();
 
             var playlistItem = GetPlaylistItem(item, mediaSources, profile, _session.DeviceId, mediaSourceId, audioStreamIndex, subtitleStreamIndex);
@@ -533,6 +532,7 @@ namespace Emby.Dlna.PlayTo
                     streamInfo.TargetAudioBitrate,
                     streamInfo.TargetAudioSampleRate,
                     streamInfo.TargetAudioChannels,
+                    streamInfo.TargetAudioBitDepth,
                     streamInfo.IsDirectStream,
                     streamInfo.RunTimeTicks,
                     streamInfo.TranscodeSeekInfo);
@@ -542,7 +542,7 @@ namespace Emby.Dlna.PlayTo
             {
                 var list = new ContentFeatureBuilder(profile)
                     .BuildVideoHeader(streamInfo.Container,
-                    streamInfo.VideoCodec,
+                    streamInfo.TargetVideoCodec,
                     streamInfo.TargetAudioCodec,
                     streamInfo.TargetWidth,
                     streamInfo.TargetHeight,
@@ -557,6 +557,7 @@ namespace Emby.Dlna.PlayTo
                     streamInfo.TargetPacketLength,
                     streamInfo.TranscodeSeekInfo,
                     streamInfo.IsTargetAnamorphic,
+                    streamInfo.IsTargetInterlaced,
                     streamInfo.TargetRefFrames,
                     streamInfo.TargetVideoStreamCount,
                     streamInfo.TargetAudioStreamCount,

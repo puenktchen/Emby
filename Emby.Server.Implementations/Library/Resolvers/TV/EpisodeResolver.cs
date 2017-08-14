@@ -3,6 +3,7 @@ using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
 using System.Linq;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.IO;
 
 namespace Emby.Server.Implementations.Library.Resolvers.TV
 {
@@ -11,10 +12,6 @@ namespace Emby.Server.Implementations.Library.Resolvers.TV
     /// </summary>
     public class EpisodeResolver : BaseVideoResolver<Episode>
     {
-        public EpisodeResolver(ILibraryManager libraryManager) : base(libraryManager)
-        {
-        }
-
         /// <summary>
         /// Resolves the specified args.
         /// </summary>
@@ -57,12 +54,17 @@ namespace Emby.Server.Implementations.Library.Resolvers.TV
                     {
                         episode.SeriesId = series.Id;
                         episode.SeriesName = series.Name;
-                        episode.SeriesSortName = series.SortName;
                     }
                     if (season != null)
                     {
                         episode.SeasonId = season.Id;
                         episode.SeasonName = season.Name;
+                    }
+
+                    // Assume season 1 if there's no season folder and a season number could not be determined
+                    if (season == null && !episode.ParentIndexNumber.HasValue && (episode.IndexNumber.HasValue || episode.PremiereDate.HasValue))
+                    {
+                        episode.ParentIndexNumber = 1;
                     }
                 }
 
@@ -70,6 +72,10 @@ namespace Emby.Server.Implementations.Library.Resolvers.TV
             }
 
             return null;
+        }
+
+        public EpisodeResolver(ILibraryManager libraryManager, IFileSystem fileSystem) : base(libraryManager, fileSystem)
+        {
         }
     }
 }

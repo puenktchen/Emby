@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Xml;
@@ -35,7 +35,7 @@ namespace MediaBrowser.XbmcMetadata.Savers
                 list.Add(Path.Combine(path, "VIDEO_TS", "VIDEO_TS.nfo"));
             }
 
-            if (!item.IsPlaceHolder && (item.VideoType == VideoType.Dvd || item.VideoType == VideoType.BluRay || item.VideoType == VideoType.HdDvd))
+            if (!item.IsPlaceHolder && (item.VideoType == VideoType.Dvd || item.VideoType == VideoType.BluRay))
             {
                 var path = item.ContainingFolderPath;
 
@@ -51,6 +51,11 @@ namespace MediaBrowser.XbmcMetadata.Savers
                 //}
 
                 list.Add(Path.ChangeExtension(item.Path, ".nfo"));
+
+                if (!item.IsInMixedFolder)
+                {
+                    list.Add(Path.Combine(item.ContainingFolderPath, "movie.nfo"));
+                }
             }
 
             return list;
@@ -113,16 +118,16 @@ namespace MediaBrowser.XbmcMetadata.Savers
             }
         }
 
-        protected override List<string> GetTagsUsed()
+        protected override List<string> GetTagsUsed(IHasMetadata item)
         {
-            var list = new List<string>
+            var list = base.GetTagsUsed(item);
+            list.AddRange(new string[]
             {
-                    "album",
-                    "artist",
-                    "set",
-                    "id"
-            };
-
+                "album",
+                "artist",
+                "set",
+                "id"
+            });
             return list;
         }
 

@@ -16,7 +16,11 @@ namespace MediaBrowser.Controller.LiveTv
         {
             var list = base.GetUserDataKeys();
 
-            list.Insert(0, GetClientTypeName() + "-" + Name);
+            if (!ConfigurationManager.Configuration.DisableLiveTvChannelUserDataName)
+            {
+                list.Insert(0, GetClientTypeName() + "-" + Name);
+            }
+
             return list;
         }
 
@@ -51,7 +55,6 @@ namespace MediaBrowser.Controller.LiveTv
         public override SourceType SourceType
         {
             get { return SourceType.LiveTV; }
-            set { }
         }
 
         [IgnoreDataMember]
@@ -93,11 +96,11 @@ namespace MediaBrowser.Controller.LiveTv
 
                 if (double.TryParse(Number, NumberStyles.Any, CultureInfo.InvariantCulture, out number))
                 {
-                    return number.ToString("00000-") + (Name ?? string.Empty);
+                    return string.Format("{0:00000.0}", number) + "-" + (Name ?? string.Empty);
                 }
             }
 
-            return Number + "-" + (Name ?? string.Empty);
+            return (Number ?? string.Empty) + "-" + (Name ?? string.Empty);
         }
 
         [IgnoreDataMember]
@@ -119,7 +122,7 @@ namespace MediaBrowser.Controller.LiveTv
             return new List<BaseItem>();
         }
 
-        public IEnumerable<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution)
+        public List<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution)
         {
             var list = new List<MediaSourceInfo>();
 
@@ -139,6 +142,11 @@ namespace MediaBrowser.Controller.LiveTv
             list.Add(info);
 
             return list;
+        }
+
+        public List<MediaStream> GetMediaStreams()
+        {
+            return new List<MediaStream>();
         }
 
         protected override string GetInternalMetadataPath(string basePath)

@@ -16,7 +16,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Xml;
@@ -49,12 +49,12 @@ namespace MediaBrowser.Providers.TV
             get { return "TheTVDB"; }
         }
 
-        public bool Supports(IHasImages item)
+        public bool Supports(IHasMetadata item)
         {
             return item is Series;
         }
 
-        public IEnumerable<ImageType> GetSupportedImages(IHasImages item)
+        public IEnumerable<ImageType> GetSupportedImages(IHasMetadata item)
         {
             return new List<ImageType>
             {
@@ -64,22 +64,18 @@ namespace MediaBrowser.Providers.TV
             };
         }
 
-        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasImages item, CancellationToken cancellationToken)
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasMetadata item, CancellationToken cancellationToken)
         {
             if (TvdbSeriesProvider.IsValidSeries(item.ProviderIds))
             {
                 var language = item.GetPreferredMetadataLanguage();
 
-                var seriesDataPath = await TvdbSeriesProvider.Current.EnsureSeriesInfo(item.ProviderIds, language, cancellationToken).ConfigureAwait(false);
+                var seriesDataPath = await TvdbSeriesProvider.Current.EnsureSeriesInfo(item.ProviderIds, item.Name, item.ProductionYear, language, cancellationToken).ConfigureAwait(false);
 
                 var path = Path.Combine(seriesDataPath, "banners.xml");
 
                 try
                 {
-                    var seriesOffset = TvdbSeriesProvider.GetSeriesOffset(item.ProviderIds);
-                    if (seriesOffset != null && seriesOffset.Value != 0)
-                        return TvdbSeasonImageProvider.GetImages(path, language, seriesOffset.Value + 1, _xmlReaderSettingsFactory, _fileSystem, cancellationToken);
-                    
                     return GetImages(path, language, cancellationToken);
                 }
                 catch (FileNotFoundException)
@@ -173,8 +169,7 @@ namespace MediaBrowser.Providers.TV
                 return 0;
             })
                 .ThenByDescending(i => i.CommunityRating ?? 0)
-                .ThenByDescending(i => i.VoteCount ?? 0)
-                .ToList();
+                .ThenByDescending(i => i.VoteCount ?? 0);
         }
 
         private void AddImage(XmlReader reader, List<RemoteImageInfo> images)
@@ -351,8 +346,7 @@ namespace MediaBrowser.Providers.TV
             return _httpClient.GetResponse(new HttpRequestOptions
             {
                 CancellationToken = cancellationToken,
-                Url = url,
-                ResourcePool = TvdbSeriesProvider.Current.TvDbResourcePool
+                Url = url
             });
         }
     }

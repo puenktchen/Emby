@@ -16,7 +16,7 @@ using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
@@ -184,7 +184,7 @@ namespace MediaBrowser.Providers.People
 
                 if (!string.IsNullOrWhiteSpace(info.place_of_birth))
                 {
-                    item.ProductionLocations = new List<string> { info.place_of_birth };
+                    item.ProductionLocations = new string[] { info.place_of_birth };
                 }
                 item.Overview = info.biography;
 
@@ -250,7 +250,7 @@ namespace MediaBrowser.Providers.People
 
             }).ConfigureAwait(false))
             {
-                _fileSystem.CreateDirectory(Path.GetDirectoryName(dataFilePath));
+                _fileSystem.CreateDirectory(_fileSystem.GetDirectoryName(dataFilePath));
 
                 using (var fs = _fileSystem.GetFileStream(dataFilePath, FileOpenMode.Create, FileAccessMode.Write, FileShareMode.Read, true))
                 {

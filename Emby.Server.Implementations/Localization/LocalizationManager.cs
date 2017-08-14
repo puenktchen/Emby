@@ -132,7 +132,7 @@ namespace Emby.Server.Implementations.Localization
         /// Gets the cultures.
         /// </summary>
         /// <returns>IEnumerable{CultureDto}.</returns>
-        public IEnumerable<CultureDto> GetCultures()
+        public List<CultureDto> GetCultures()
         {
             var type = GetType();
             var path = type.Namespace + ".iso6392.txt";
@@ -169,14 +169,14 @@ namespace Emby.Server.Implementations.Localization
             return list.Where(i => !string.IsNullOrWhiteSpace(i.Name) &&
                 !string.IsNullOrWhiteSpace(i.DisplayName) &&
                 !string.IsNullOrWhiteSpace(i.ThreeLetterISOLanguageName) &&
-                !string.IsNullOrWhiteSpace(i.TwoLetterISOLanguageName));
+                !string.IsNullOrWhiteSpace(i.TwoLetterISOLanguageName)).ToList();
         }
 
         /// <summary>
         /// Gets the countries.
         /// </summary>
         /// <returns>IEnumerable{CountryInfo}.</returns>
-        public IEnumerable<CountryInfo> GetCountries()
+        public List<CountryInfo> GetCountries()
         {
             var type = GetType();
             var path = type.Namespace + ".countries.json";
@@ -408,6 +408,7 @@ namespace Emby.Server.Implementations.Localization
                 new LocalizatonOption{ Name="Italian", Value="it"},
                 new LocalizatonOption{ Name="Kazakh", Value="kk"},
                 new LocalizatonOption{ Name="Norwegian Bokmål", Value="nb"},
+                new LocalizatonOption{ Name="Persian", Value="fa"},
                 new LocalizatonOption{ Name="Polish", Value="pl"},
                 new LocalizatonOption{ Name="Portuguese (Brazil)", Value="pt-BR"},
                 new LocalizatonOption{ Name="Portuguese (Portugal)", Value="pt-PT"},

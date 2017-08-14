@@ -13,6 +13,19 @@ namespace MediaBrowser.XbmcMetadata.Parsers
 {
     public class SeriesNfoParser : BaseNfoParser<Series>
     {
+        protected override bool SupportsUrlAfterClosingXmlTag
+        {
+            get
+            {
+                return true;
+            }
+        }
+
+        protected override string MovieDbParserSearchString
+        {
+            get { return "themoviedb.org/tv/"; }
+        }
+
         /// <summary>
         /// Fetches the data from XML node.
         /// </summary>
@@ -49,37 +62,21 @@ namespace MediaBrowser.XbmcMetadata.Parsers
                         break;
                     }
                 case "airs_dayofweek":
-                    {
-                        item.AirDays = TVUtils.GetAirDays(reader.ReadElementContentAsString());
-                        break;
-                    }
+                {
+                    item.AirDays = TVUtils.GetAirDays(reader.ReadElementContentAsString());
+                    break;
+                }
 
                 case "airs_time":
+                {
+                    var val = reader.ReadElementContentAsString();
+
+                    if (!string.IsNullOrWhiteSpace(val))
                     {
-                        var val = reader.ReadElementContentAsString();
-
-                        if (!string.IsNullOrWhiteSpace(val))
-                        {
-                            item.AirTime = val;
-                        }
-                        break;
+                        item.AirTime = val;
                     }
-
-                case "animeseriesindex":
-                    {
-                        var number = reader.ReadElementContentAsString();
-
-                        if (!string.IsNullOrWhiteSpace(number))
-                        {
-                            int num;
-
-                            if (int.TryParse(number, out num))
-                            {
-                                item.AnimeSeriesIndex = num;
-                            }
-                        }
-                        break;
-                    }
+                    break;
+                }
 
                 case "status":
                     {

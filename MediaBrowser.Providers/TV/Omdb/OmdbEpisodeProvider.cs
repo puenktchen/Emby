@@ -12,7 +12,7 @@ using MediaBrowser.Providers.Omdb;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 
 namespace MediaBrowser.Providers.TV
@@ -50,7 +50,7 @@ namespace MediaBrowser.Providers.TV
             };
 
             // Allowing this will dramatically increase scan times
-            if (info.IsMissingEpisode || info.IsVirtualUnaired)
+            if (info.IsMissingEpisode)
             {
                 return result;
             }
@@ -58,11 +58,10 @@ namespace MediaBrowser.Providers.TV
             string seriesImdbId;
             if (info.SeriesProviderIds.TryGetValue(MetadataProviders.Imdb.ToString(), out seriesImdbId) && !string.IsNullOrEmpty(seriesImdbId))
             {
-                if (info.IndexNumber.HasValue &&
-                    info.ParentIndexNumber.HasValue)
+                if (info.IndexNumber.HasValue && info.ParentIndexNumber.HasValue)
                 {
                     result.HasMetadata = await new OmdbProvider(_jsonSerializer, _httpClient, _fileSystem, _configurationManager)
-                        .FetchEpisodeData(result, info.IndexNumber.Value, info.ParentIndexNumber.Value, seriesImdbId, info.MetadataLanguage, info.MetadataCountryCode, cancellationToken).ConfigureAwait(false);
+                        .FetchEpisodeData(result, info.IndexNumber.Value, info.ParentIndexNumber.Value, info.GetProviderId(MetadataProviders.Imdb), seriesImdbId, info.MetadataLanguage, info.MetadataCountryCode, cancellationToken).ConfigureAwait(false);
                 }
             }
 

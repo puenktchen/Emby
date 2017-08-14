@@ -17,7 +17,7 @@ using System.Net;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Net;
@@ -27,7 +27,6 @@ namespace MediaBrowser.Providers.Music
 {
     public class FanartArtistProvider : IRemoteImageProvider, IHasOrder
     {
-        internal readonly SemaphoreSlim FanArtResourcePool = new SemaphoreSlim(3, 3);
         internal const string ApiKey = "5c6b04c68e904cfed1e6cbc9a9e683d4";
         private const string FanArtBaseUrl = "https://webservice.fanart.tv/v3.1/music/{1}?api_key={0}";
 
@@ -59,12 +58,12 @@ namespace MediaBrowser.Providers.Music
             get { return "FanArt"; }
         }
 
-        public bool Supports(IHasImages item)
+        public bool Supports(IHasMetadata item)
         {
             return item is MusicArtist;
         }
 
-        public IEnumerable<ImageType> GetSupportedImages(IHasImages item)
+        public IEnumerable<ImageType> GetSupportedImages(IHasMetadata item)
         {
             return new List<ImageType>
             {
@@ -76,7 +75,7 @@ namespace MediaBrowser.Providers.Music
             };
         }
 
-        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasImages item, CancellationToken cancellationToken)
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasMetadata item, CancellationToken cancellationToken)
         {
             var artist = (MusicArtist)item;
 
@@ -248,14 +247,13 @@ namespace MediaBrowser.Providers.Music
 
             var jsonPath = GetArtistJsonPath(_config.ApplicationPaths, musicBrainzId);
 
-            _fileSystem.CreateDirectory(Path.GetDirectoryName(jsonPath));
+            _fileSystem.CreateDirectory(_fileSystem.GetDirectoryName(jsonPath));
 
             try
             {
                 using (var response = await _httpClient.Get(new HttpRequestOptions
                 {
                     Url = url,
-                    ResourcePool = FanArtResourcePool,
                     CancellationToken = cancellationToken,
                     BufferContent = true
 

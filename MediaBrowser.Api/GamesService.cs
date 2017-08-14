@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using MediaBrowser.Model.Querying;
 using MediaBrowser.Model.Services;
+using MediaBrowser.Model.Extensions;
 
 namespace MediaBrowser.Api
 {
@@ -110,7 +111,11 @@ namespace MediaBrowser.Api
             var user = request.UserId == null ? null : _userManager.GetUserById(request.UserId);
             var query = new InternalItemsQuery(user)
             {
-                IncludeItemTypes = new[] { typeof(GameSystem).Name }
+                IncludeItemTypes = new[] { typeof(GameSystem).Name },
+                DtoOptions = new DtoOptions(false)
+                {
+                    EnableImages = false
+                }
             };
             var gameSystems = _libraryManager.GetItemList(query)
                 .Cast<GameSystem>()
@@ -130,7 +135,11 @@ namespace MediaBrowser.Api
             var user = request.UserId == null ? null : _userManager.GetUserById(request.UserId);
             var query = new InternalItemsQuery(user)
             {
-                IncludeItemTypes = new[] { typeof(Game).Name }
+                IncludeItemTypes = new[] { typeof(Game).Name },
+                DtoOptions = new DtoOptions(false)
+                {
+                    EnableImages = false
+                }
             };
             var games = _libraryManager.GetItemList(query)
                 .Cast<Game>()
@@ -167,7 +176,11 @@ namespace MediaBrowser.Api
                 system.GetRecursiveChildren(i => i is Game) :
                 system.GetRecursiveChildren(user, new InternalItemsQuery(user)
                 {
-                    IncludeItemTypes = new[] { typeof(Game).Name }
+                    IncludeItemTypes = new[] { typeof(Game).Name },
+                    DtoOptions = new DtoOptions(false)
+                    {
+                        EnableImages = false
+                    }
                 });
 
             var games = items.Cast<Game>().ToList();
@@ -215,11 +228,13 @@ namespace MediaBrowser.Api
                 SimilarTo = item,
                 DtoOptions = dtoOptions
 
-            }).ToList();
+            });
+
+            var returnList = (await _dtoService.GetBaseItemDtos(itemsResult, dtoOptions, user).ConfigureAwait(false));
 
             var result = new QueryResult<BaseItemDto>
             {
-                Items = (await _dtoService.GetBaseItemDtos(itemsResult, dtoOptions, user).ConfigureAwait(false)).ToArray(),
+                Items = returnList.ToArray(returnList.Count),
 
                 TotalRecordCount = itemsResult.Count
             };

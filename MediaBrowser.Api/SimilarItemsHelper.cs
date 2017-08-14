@@ -11,6 +11,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Services;
+using MediaBrowser.Model.Extensions;
 
 namespace MediaBrowser.Api
 {
@@ -61,7 +62,7 @@ namespace MediaBrowser.Api
         /// Fields to return within the items, in addition to basic information
         /// </summary>
         /// <value>The fields.</value>
-        [ApiMember(Name = "Fields", Description = "Optional. Specify additional fields of information to return in the output. This allows multiple, comma delimeted. Options: Budget, Chapters, CriticRatingSummary, DateCreated, Genres, HomePageUrl, IndexOptions, MediaStreams, Overview, ParentId, Path, People, ProviderIds, PrimaryImageAspectRatio, Revenue, SortName, Studios, Taglines, TrailerUrls", IsRequired = false, DataType = "string", ParameterType = "query", Verb = "GET", AllowMultiple = true)]
+        [ApiMember(Name = "Fields", Description = "Optional. Specify additional fields of information to return in the output. This allows multiple, comma delimeted. Options: Budget, Chapters, DateCreated, Genres, HomePageUrl, IndexOptions, MediaStreams, Overview, ParentId, Path, People, ProviderIds, PrimaryImageAspectRatio, Revenue, SortName, Studios, Taglines, TrailerUrls", IsRequired = false, DataType = "string", ParameterType = "query", Verb = "GET", AllowMultiple = true)]
         public string Fields { get; set; }
     }
 
@@ -80,7 +81,7 @@ namespace MediaBrowser.Api
 
             var query = new InternalItemsQuery(user)
             {
-                IncludeItemTypes = includeTypes.Select(i => i.Name).ToArray(),
+                IncludeItemTypes = includeTypes.Select(i => i.Name).ToArray(includeTypes.Length),
                 Recursive = true,
                 DtoOptions = dtoOptions
             };
@@ -107,7 +108,7 @@ namespace MediaBrowser.Api
 
             return new QueryResult<BaseItemDto>
             {
-                Items = dtos.ToArray(),
+                Items = dtos.ToArray(dtos.Count),
 
                 TotalRecordCount = items.Count
             };
@@ -142,11 +143,6 @@ namespace MediaBrowser.Api
             return item.Tags;
         }
 
-        private static IEnumerable<string> GetKeywords(BaseItem item)
-        {
-            return item.Keywords;
-        }
-
         /// <summary>
         /// Gets the similiarity score.
         /// </summary>
@@ -169,9 +165,6 @@ namespace MediaBrowser.Api
 
             // Find common tags
             points += GetTags(item1).Where(i => GetTags(item2).Contains(i, StringComparer.OrdinalIgnoreCase)).Sum(i => 10);
-
-            // Find common keywords
-            points += GetKeywords(item1).Where(i => GetKeywords(item2).Contains(i, StringComparer.OrdinalIgnoreCase)).Sum(i => 10);
 
             // Find common studios
             points += item1.Studios.Where(i => item2.Studios.Contains(i, StringComparer.OrdinalIgnoreCase)).Sum(i => 3);

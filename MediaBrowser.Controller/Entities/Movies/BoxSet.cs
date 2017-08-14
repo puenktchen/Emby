@@ -21,14 +21,15 @@ namespace MediaBrowser.Controller.Entities.Movies
 
         public BoxSet()
         {
-            RemoteTrailers = new List<MediaUrl>();
-            LocalTrailerIds = new List<Guid>();
-            RemoteTrailerIds = new List<Guid>();
+            RemoteTrailers = EmptyMediaUrlArray;
+            LocalTrailerIds = EmptyGuidArray;
+            RemoteTrailerIds = EmptyGuidArray;
 
             DisplayOrder = ItemSortBy.PremiereDate;
             Shares = new List<Share>();
         }
 
+        [IgnoreDataMember]
         protected override bool FilterLinkedChildrenPerUser
         {
             get
@@ -37,14 +38,23 @@ namespace MediaBrowser.Controller.Entities.Movies
             }
         }
 
-        public List<Guid> LocalTrailerIds { get; set; }
-        public List<Guid> RemoteTrailerIds { get; set; }
+        [IgnoreDataMember]
+        public override bool SupportsInheritedParentImages
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        public Guid[] LocalTrailerIds { get; set; }
+        public Guid[] RemoteTrailerIds { get; set; }
 
         /// <summary>
         /// Gets or sets the remote trailers.
         /// </summary>
         /// <value>The remote trailers.</value>
-        public List<MediaUrl> RemoteTrailers { get; set; }
+        public MediaUrl[] RemoteTrailers { get; set; }
 
         /// <summary>
         /// Gets or sets the display order.
@@ -55,6 +65,14 @@ namespace MediaBrowser.Controller.Entities.Movies
         protected override bool GetBlockUnratedValue(UserPolicy config)
         {
             return config.BlockUnratedItems.Contains(UnratedItem.Movie);
+        }
+
+        public override double? GetDefaultPrimaryImageAspectRatio()
+        {
+            double value = 2;
+            value /= 3;
+
+            return value;
         }
 
         public override UnratedItem GetBlockUnratedType()
@@ -71,7 +89,7 @@ namespace MediaBrowser.Controller.Entities.Movies
             return new List<BaseItem>();
         }
 
-        protected override IEnumerable<BaseItem> LoadChildren()
+        protected override List<BaseItem> LoadChildren()
         {
             if (IsLegacyBoxSet)
             {
@@ -98,7 +116,7 @@ namespace MediaBrowser.Controller.Entities.Movies
             {
                 if (IsLegacyBoxSet)
                 {
-                    return true;
+                    return false;
                 }
 
                 return false;
@@ -110,6 +128,11 @@ namespace MediaBrowser.Controller.Entities.Movies
         {
             get
             {
+                if (string.IsNullOrWhiteSpace(Path))
+                {
+                    return false;
+                }
+
                 return !FileSystem.ContainsSubPath(ConfigurationManager.ApplicationPaths.DataPath, Path);
             }
         }
@@ -125,17 +148,6 @@ namespace MediaBrowser.Controller.Entities.Movies
         }
 
         /// <summary>
-        /// Gets the trailer ids.
-        /// </summary>
-        /// <returns>List&lt;Guid&gt;.</returns>
-        public List<Guid> GetTrailerIds()
-        {
-            var list = LocalTrailerIds.ToList();
-            list.AddRange(RemoteTrailerIds);
-            return list;
-        }
-
-        /// <summary>
         /// Updates the official rating based on content and returns true or false indicating if it changed.
         /// </summary>
         /// <returns></returns>
@@ -144,9 +156,7 @@ namespace MediaBrowser.Controller.Entities.Movies
             var currentOfficialRating = OfficialRating;
 
             // Gather all possible ratings
-            var ratings = GetRecursiveChildren()
-                .Concat(GetLinkedChildren())
-                .Where(i => i is Movie || i is Series || i is MusicAlbum || i is Game)
+            var ratings = GetLinkedChildren()
                 .Select(i => i.OfficialRating)
                 .Where(i => !string.IsNullOrEmpty(i))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -197,7 +207,7 @@ namespace MediaBrowser.Controller.Entities.Movies
 
             if (base.IsVisible(user))
             {
-                return GetChildren(user, true).Any();
+                return base.GetChildren(user, true).Any();
             }
 
             return false;

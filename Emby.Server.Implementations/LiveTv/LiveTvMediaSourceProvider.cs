@@ -14,6 +14,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Model.Dlna;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.LiveTv
 {
@@ -78,8 +79,7 @@ namespace Emby.Server.Implementations.LiveTv
             {
                 var hasMediaSources = (IHasMediaSources)item;
 
-                sources = _mediaSourceManager.GetStaticMediaSources(hasMediaSources, false)
-                   .ToList();
+                sources = _mediaSourceManager.GetStaticMediaSources(hasMediaSources, false);
 
                 forceRequireOpening = true;
             }
@@ -103,8 +103,8 @@ namespace Emby.Server.Implementations.LiveTv
                     openKeys.Add(item.GetType().Name);
                     openKeys.Add(item.Id.ToString("N"));
                     openKeys.Add(source.Id ?? string.Empty);
-                    source.OpenToken = string.Join(StreamIdDelimeterString, openKeys.ToArray());
-                } 
+                    source.OpenToken = string.Join(StreamIdDelimeterString, openKeys.ToArray(openKeys.Count));
+                }
 
                 // Dummy this up so that direct play checks can still run
                 if (string.IsNullOrEmpty(source.Path) && source.Protocol == MediaProtocol.Http)
@@ -118,7 +118,7 @@ namespace Emby.Server.Implementations.LiveTv
             return list;
         }
 
-        public async Task<Tuple<MediaSourceInfo, IDirectStreamProvider>> OpenMediaSource(string openToken, CancellationToken cancellationToken)
+        public async Task<Tuple<MediaSourceInfo, IDirectStreamProvider>> OpenMediaSource(string openToken, bool allowLiveStreamProbe, CancellationToken cancellationToken)
         {
             MediaSourceInfo stream = null;
             const bool isAudio = false;
@@ -140,9 +140,9 @@ namespace Emby.Server.Implementations.LiveTv
 
             try
             {
-                if (!stream.SupportsProbing || stream.MediaStreams.Any(i => i.Index != -1))
+                if (!allowLiveStreamProbe || !stream.SupportsProbing || stream.MediaStreams.Any(i => i.Index != -1))
                 {
-                    await AddMediaInfo(stream, isAudio, cancellationToken).ConfigureAwait(false);
+                    AddMediaInfo(stream, isAudio, cancellationToken);
                 }
                 else
                 {
@@ -154,10 +154,11 @@ namespace Emby.Server.Implementations.LiveTv
                 _logger.ErrorException("Error probing live tv stream", ex);
             }
 
+            _logger.Info("Live stream info: {0}", _jsonSerializer.SerializeToString(stream));
             return new Tuple<MediaSourceInfo, IDirectStreamProvider>(stream, directStreamProvider);
         }
 
-        private async Task AddMediaInfo(MediaSourceInfo mediaSource, bool isAudio, CancellationToken cancellationToken)
+        private void AddMediaInfo(MediaSourceInfo mediaSource, bool isAudio, CancellationToken cancellationToken)
         {
             mediaSource.DefaultSubtitleStreamIndex = null;
 
@@ -182,19 +183,24 @@ namespace Emby.Server.Implementations.LiveTv
                 {
                     var width = videoStream.Width ?? 1920;
 
-                    if (width >= 1900)
+                    if (width >= 3000)
+                    {
+                        videoStream.BitRate = 30000000;
+                    }
+
+                    else if (width >= 1900)
+                    {
+                        videoStream.BitRate = 20000000;
+                    }
+
+                    else if (width >= 1200)
                     {
                         videoStream.BitRate = 8000000;
                     }
 
-                    else if (width >= 1260)
-                    {
-                        videoStream.BitRate = 3000000;
-                    }
-
                     else if (width >= 700)
                     {
-                        videoStream.BitRate = 1000000;
+                        videoStream.BitRate = 2000000;
                     }
                 }
             }

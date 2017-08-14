@@ -3,7 +3,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Logging;
 using System;
 using System.Collections.Generic;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Model.IO;
 
 namespace MediaBrowser.Controller.IO
@@ -13,6 +13,17 @@ namespace MediaBrowser.Controller.IO
     /// </summary>
     public static class FileData
     {
+        private static Dictionary<string, FileSystemMetadata> GetFileSystemDictionary(FileSystemMetadata[] list)
+        {
+            var dict = new Dictionary<string, FileSystemMetadata>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var file in list)
+            {
+                dict[file.FullName] = file;
+            }
+            return dict;
+        }
+
         /// <summary>
         /// Gets the filtered file system entries.
         /// </summary>
@@ -42,12 +53,12 @@ namespace MediaBrowser.Controller.IO
                 throw new ArgumentNullException("args");
             }
 
+            var entries = directoryService.GetFileSystemEntries(path);
+
             if (!resolveShortcuts && flattenFolderDepth == 0)
             {
-                return directoryService.GetFileSystemDictionary(path);
+                return GetFileSystemDictionary(entries);
             }
-
-            var entries = directoryService.GetFileSystemEntries(path);
 
             var dict = new Dictionary<string, FileSystemMetadata>(StringComparer.OrdinalIgnoreCase);
 

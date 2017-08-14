@@ -89,7 +89,9 @@ namespace MediaBrowser.Model.Dto
         /// </summary>
         /// <value><c>true</c> if this instance has configured easy password; otherwise, <c>false</c>.</value>
         public bool HasConfiguredEasyPassword { get; set; }
-        
+
+        public bool? EnableAutoLogin { get; set; }
+
         /// <summary>
         /// Gets or sets the last login date.
         /// </summary>
@@ -119,16 +121,6 @@ namespace MediaBrowser.Model.Dto
         /// </summary>
         /// <value>The primary image aspect ratio.</value>
         public double? PrimaryImageAspectRatio { get; set; }
-
-        /// <summary>
-        /// Gets a value indicating whether this instance has primary image.
-        /// </summary>
-        /// <value><c>true</c> if this instance has primary image; otherwise, <c>false</c>.</value>
-        [IgnoreDataMember]
-        public bool HasPrimaryImage
-        {
-            get { return PrimaryImageTag != null; }
-        }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="UserDto"/> class.

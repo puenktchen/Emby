@@ -48,11 +48,25 @@ namespace MediaBrowser.Controller.LiveTv
             return list;
         }
 
+        private static string EmbyServiceName = "Emby";
+        public override double? GetDefaultPrimaryImageAspectRatio()
+        {
+            var serviceName = ServiceName;
+            if (!IsMovie && !string.Equals(serviceName, EmbyServiceName, StringComparison.OrdinalIgnoreCase) || !string.IsNullOrWhiteSpace(serviceName))
+            {
+                return null;
+            }
+
+            double value = 2;
+            value /= 3;
+
+            return value;
+        }
+
         [IgnoreDataMember]
         public override SourceType SourceType
         {
             get { return SourceType.LiveTV; }
-            set { }
         }
 
         /// <summary>
@@ -204,19 +218,13 @@ namespace MediaBrowser.Controller.LiveTv
 
         public override bool IsInternetMetadataEnabled()
         {
-            if (IsMovie)
-            {
-                var options = (LiveTvOptions)ConfigurationManager.GetConfiguration("livetv");
-                return options.EnableMovieProviders;
-            }
-
             return false;
         }
 
         public LiveTvProgramLookupInfo GetLookupInfo()
         {
             var info = GetItemLookupInfo<LiveTvProgramLookupInfo>();
-            info.IsMovie = IsMovie; 
+            info.IsMovie = IsMovie;
             return info;
         }
 

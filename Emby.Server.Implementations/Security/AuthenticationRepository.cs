@@ -11,6 +11,7 @@ using MediaBrowser.Controller.Security;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Querying;
 using SQLitePCL.pretty;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.Security
 {
@@ -74,7 +75,7 @@ namespace Emby.Server.Implementations.Security
                     {
                         using (var statement = db.PrepareStatement("replace into AccessTokens (Id, AccessToken, DeviceId, AppName, AppVersion, DeviceName, UserId, IsActive, DateCreated, DateRevoked) values (@Id, @AccessToken, @DeviceId, @AppName, @AppVersion, @DeviceName, @UserId, @IsActive, @DateCreated, @DateRevoked)"))
                         {
-                            statement.TryBind("@Id", info.Id.ToGuidParamValue());
+                            statement.TryBind("@Id", info.Id.ToGuidBlob());
                             statement.TryBind("@AccessToken", info.AccessToken);
 
                             statement.TryBind("@DeviceId", info.DeviceId);
@@ -174,13 +175,13 @@ namespace Emby.Server.Implementations.Security
 
             var whereTextWithoutPaging = whereClauses.Count == 0 ?
               string.Empty :
-              " where " + string.Join(" AND ", whereClauses.ToArray());
+              " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
             if (startIndex > 0)
             {
                 var pagingWhereText = whereClauses.Count == 0 ?
                     string.Empty :
-                    " where " + string.Join(" AND ", whereClauses.ToArray());
+                    " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
                 whereClauses.Add(string.Format("Id NOT IN (SELECT Id FROM AccessTokens {0} ORDER BY DateCreated LIMIT {1})",
                     pagingWhereText,
@@ -189,7 +190,7 @@ namespace Emby.Server.Implementations.Security
 
             var whereText = whereClauses.Count == 0 ?
                 string.Empty :
-                " where " + string.Join(" AND ", whereClauses.ToArray());
+                " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
             commandText += whereText;
 
@@ -236,7 +237,7 @@ namespace Emby.Server.Implementations.Security
                             }
                         }
 
-                        result.Items = list.ToArray();
+                        result.Items = list.ToArray(list.Count);
                         return result;
 
                     }, ReadTransactionMode);
@@ -259,7 +260,7 @@ namespace Emby.Server.Implementations.Security
 
                     using (var statement = connection.PrepareStatement(commandText))
                     {
-                        statement.BindParameters["@Id"].Bind(id.ToGuidParamValue());
+                        statement.BindParameters["@Id"].Bind(id.ToGuidBlob());
 
                         foreach (var row in statement.ExecuteQuery())
                         {
@@ -275,7 +276,7 @@ namespace Emby.Server.Implementations.Security
         {
             var info = new AuthenticationInfo
             {
-                Id = reader[0].ReadGuid().ToString("N"),
+                Id = reader[0].ReadGuidFromBlob().ToString("N"),
                 AccessToken = reader[1].ToString()
             };
 

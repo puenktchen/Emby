@@ -9,7 +9,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using MediaBrowser.Common.Extensions;
-using MediaBrowser.Controller.Channels;
+using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Serialization;
 
 namespace MediaBrowser.Controller.Entities.Audio
@@ -24,15 +24,15 @@ namespace MediaBrowser.Controller.Entities.Audio
         IHasLookupInfo<SongInfo>,
         IHasMediaSources
     {
-        public List<ChannelMediaInfo> ChannelMediaSources { get; set; }
-
         /// <summary>
         /// Gets or sets the artist.
         /// </summary>
         /// <value>The artist.</value>
+        [IgnoreDataMember]
         public List<string> Artists { get; set; }
 
-        public List<string> AlbumArtists { get; set; }
+        [IgnoreDataMember]
+        public string[] AlbumArtists { get; set; }
 
         [IgnoreDataMember]
         public override bool EnableRefreshOnDateModifiedChange
@@ -43,7 +43,12 @@ namespace MediaBrowser.Controller.Entities.Audio
         public Audio()
         {
             Artists = new List<string>();
-            AlbumArtists = new List<string>();
+            AlbumArtists = EmptyStringArray;
+        }
+
+        public override double? GetDefaultPrimaryImageAspectRatio()
+        {
+            return 1;
         }
 
         [IgnoreDataMember]
@@ -191,6 +196,23 @@ namespace MediaBrowser.Controller.Entities.Audio
             return base.GetBlockUnratedType();
         }
 
+        public List<MediaStream> GetMediaStreams()
+        {
+            return MediaSourceManager.GetMediaStreams(new MediaStreamQuery
+            {
+                ItemId = Id
+            });
+        }
+
+        public List<MediaStream> GetMediaStreams(MediaStreamType type)
+        {
+            return MediaSourceManager.GetMediaStreams(new MediaStreamQuery
+            {
+                ItemId = Id,
+                Type = type
+            });
+        }
+
         public SongInfo GetLookupInfo()
         {
             var info = GetItemLookupInfo<SongInfo>();
@@ -202,12 +224,12 @@ namespace MediaBrowser.Controller.Entities.Audio
             return info;
         }
 
-        public virtual IEnumerable<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution)
+        public virtual List<MediaSourceInfo> GetMediaSources(bool enablePathSubstitution)
         {
             if (SourceType == SourceType.Channel)
             {
                 var sources = ChannelManager.GetStaticMediaSources(this, CancellationToken.None)
-                           .Result.ToList();
+                           .ToList();
 
                 if (sources.Count > 0)
                 {
@@ -246,7 +268,7 @@ namespace MediaBrowser.Controller.Entities.Audio
             {
                 Id = i.Id.ToString("N"),
                 Protocol = locationType == LocationType.Remote ? MediaProtocol.Http : MediaProtocol.File,
-                MediaStreams = MediaSourceManager.GetMediaStreams(i.Id).ToList(),
+                MediaStreams = MediaSourceManager.GetMediaStreams(i.Id),
                 Name = i.Name,
                 Path = enablePathSubstituion ? GetMappedPath(i, i.Path, locationType) : i.Path,
                 RunTimeTicks = i.RunTimeTicks,

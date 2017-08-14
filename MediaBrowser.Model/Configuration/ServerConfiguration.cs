@@ -46,13 +46,15 @@ namespace MediaBrowser.Model.Configuration
         /// </summary>
         /// <value><c>true</c> if [use HTTPS]; otherwise, <c>false</c>.</value>
         public bool EnableHttps { get; set; }
-        public bool EnableSeriesPresentationUniqueKey { get; set; }
+        public bool EnableLocalizedGuids { get; set; }
+        public bool EnableNormalizedItemByNameIds { get; set; }
 
         /// <summary>
         /// Gets or sets the value pointing to the file system where the ssl certiifcate is located..
         /// </summary>
         /// <value>The value pointing to the file system where the ssl certiifcate is located..</value>
         public string CertificatePath { get; set; }
+        public string CertificatePassword { get; set; }
 
         /// <summary>
         /// Gets or sets a value indicating whether this instance is port authorized.
@@ -66,14 +68,14 @@ namespace MediaBrowser.Model.Configuration
         /// <value><c>true</c> if [enable case sensitive item ids]; otherwise, <c>false</c>.</value>
         public bool EnableCaseSensitiveItemIds { get; set; }
 
+        public bool DisableLiveTvChannelUserDataName { get; set; }
+
         /// <summary>
         /// Gets or sets the metadata path.
         /// </summary>
         /// <value>The metadata path.</value>
         public string MetadataPath { get; set; }
         public string MetadataNetworkPath { get; set; }
-
-        public string LastVersion { get; set; }
 
         /// <summary>
         /// Gets or sets the display name of the season zero.
@@ -160,10 +162,6 @@ namespace MediaBrowser.Model.Configuration
 
         public bool EnableAutomaticRestart { get; set; }
         public bool SkipDeserializationForBasicTypes { get; set; }
-        public bool SkipDeserializationForPrograms { get; set; }
-        public bool SkipDeserializationForAudio { get; set; }
-
-        public PathSubstitution[] PathSubstitutions { get; set; }
 
         public string ServerName { get; set; }
         public string WanDdns { get; set; }
@@ -182,19 +180,20 @@ namespace MediaBrowser.Model.Configuration
 
         public bool EnableAnonymousUsageReporting { get; set; }
         public bool EnableStandaloneMusicKeys { get; set; }
-        public bool EnableLocalizedGuids { get; set; }
         public bool EnableFolderView { get; set; }
         public bool EnableGroupingIntoCollections { get; set; }
         public bool DisplaySpecialsWithinSeasons { get; set; }
         public bool DisplayCollectionsView { get; set; }
         public string[] LocalNetworkAddresses { get; set; }
         public string[] CodecsUsed { get; set; }
-        public string[] Migrations { get; set; }
         public bool EnableChannelView { get; set; }
         public bool EnableExternalContentInSuggestions { get; set; }
-        public bool EnableSimpleArtistDetection { get; set; }
 
         public int ImageExtractionTimeoutMs { get; set; }
+
+        public PathSubstitution[] PathSubstitutions { get; set; }
+        public bool EnableSimpleArtistDetection { get; set; }
+
         /// <summary>
         /// Initializes a new instance of the <see cref="ServerConfiguration" /> class.
         /// </summary>
@@ -202,10 +201,11 @@ namespace MediaBrowser.Model.Configuration
         {
             LocalNetworkAddresses = new string[] { };
             CodecsUsed = new string[] { };
-            Migrations = new string[] { };
             ImageExtractionTimeoutMs = 0;
-
             EnableLocalizedGuids = true;
+            PathSubstitutions = new PathSubstitution[] { };
+            EnableSimpleArtistDetection = true;
+
             DisplaySpecialsWithinSeasons = true;
             EnableExternalContentInSuggestions = true;
 
@@ -219,7 +219,6 @@ namespace MediaBrowser.Model.Configuration
             EnableAnonymousUsageReporting = true;
 
             EnableAutomaticRestart = true;
-            EnableFolderView = true;
 
             EnableUPnP = true;
             SharingExpirationDays = 30;
@@ -231,7 +230,6 @@ namespace MediaBrowser.Model.Configuration
 
             LibraryMonitorDelay = 60;
 
-            PathSubstitutions = new PathSubstitution[] { };
             ContentTypes = new NameValuePair[] { };
 
             PreferredMetadataLanguage = "en";
@@ -350,7 +348,9 @@ namespace MediaBrowser.Model.Configuration
                             Limit = 1,
                             Type = ImageType.Logo
                         }
-                    }
+                    },
+
+                    DisabledImageFetchers = new [] {"FanArt"}
                 },
 
                 new MetadataOptions(1, 1280)
@@ -540,7 +540,8 @@ namespace MediaBrowser.Model.Configuration
                             Type = ImageType.Thumb
                         }
                     },
-                    DisabledMetadataFetchers = new []{ "TheMovieDb" }
+                    DisabledMetadataFetchers = new []{ "TheMovieDb" },
+                    DisabledImageFetchers = new [] { "FanArt" }
                 },
 
                 new MetadataOptions(0, 1280)
@@ -566,5 +567,11 @@ namespace MediaBrowser.Model.Configuration
                 }
             };
         }
+    }
+
+    public class PathSubstitution
+    {
+        public string From { get; set; }
+        public string To { get; set; }
     }
 }

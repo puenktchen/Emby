@@ -16,6 +16,7 @@ namespace MediaBrowser.Controller.Sync
         event EventHandler<GenericEventArgs<SyncJob>> SyncJobUpdated;
         event EventHandler<GenericEventArgs<SyncJobItem>> SyncJobItemUpdated;
         event EventHandler<GenericEventArgs<SyncJobItem>> SyncJobItemCreated;
+        event EventHandler<GenericEventArgs<SyncJobItem>> SyncJobItemCancelled;
 
         /// <summary>
         /// Creates the job.
@@ -90,6 +91,8 @@ namespace MediaBrowser.Controller.Sync
         /// </summary>
         IEnumerable<SyncTarget> GetSyncTargets(string userId);
 
+        IEnumerable<SyncTarget> GetSyncTargets(string userId, bool? supportsRemoteSync);
+
         /// <summary>
         /// Supportses the synchronize.
         /// </summary>
@@ -131,20 +134,6 @@ namespace MediaBrowser.Controller.Sync
         /// <param name="request">The request.</param>
         /// <returns>Task&lt;SyncDataResponse&gt;.</returns>
         Task<SyncDataResponse> SyncData(SyncDataRequest request);
-
-        /// <summary>
-        /// Marks the job item for removal.
-        /// </summary>
-        /// <param name="id">The identifier.</param>
-        /// <returns>Task.</returns>
-        Task MarkJobItemForRemoval(string id);
-
-        /// <summary>
-        /// Unmarks the job item for removal.
-        /// </summary>
-        /// <param name="id">The identifier.</param>
-        /// <returns>Task.</returns>
-        Task UnmarkJobItemForRemoval(string id);
 
         /// <summary>
         /// Gets the library item ids.

@@ -21,14 +21,16 @@ using Emby.Common.Implementations.EnvironmentInfo;
 using Emby.Common.Implementations.IO;
 using Emby.Common.Implementations.Logging;
 using Emby.Common.Implementations.Networking;
-using Emby.Common.Implementations.Security;
+using Emby.Server.Core.Cryptography;
+using Emby.Drawing;
 using Emby.Server.Core;
 using Emby.Server.Implementations;
 using Emby.Server.Implementations.Browser;
 using Emby.Server.Implementations.IO;
-using ImageMagickSharp;
+using Emby.Server.Implementations.Logging;
 using MediaBrowser.Common.Net;
-using MediaBrowser.Server.Startup.Common.IO;
+using MediaBrowser.Model.IO;
+using SystemEvents = Emby.Server.Implementations.SystemEvents;
 
 namespace MediaBrowser.ServerApplication
 {
@@ -47,31 +49,12 @@ namespace MediaBrowser.ServerApplication
 
         public static string ApplicationPath;
 
-        public static bool TryGetLocalFromUncDirectory(string local, out string unc)
-        {
-            if ((local == null) || (local == ""))
-            {
-                unc = "";
-                throw new ArgumentNullException("local");
-            }
+        private static IFileSystem FileSystem;
 
-            ManagementObjectSearcher searcher = new ManagementObjectSearcher("SELECT Name FROM Win32_share WHERE path ='" + local.Replace("\\", "\\\\") + "'");
-            ManagementObjectCollection coll = searcher.Get();
-            if (coll.Count == 1)
-            {
-                foreach (ManagementObject share in searcher.Get())
-                {
-                    unc = share["Name"] as String;
-                    unc = "\\\\" + SystemInformation.ComputerName + "\\" + unc;
-                    return true;
-                }
-            }
-            unc = "";
-            return false;
-        }
         /// <summary>
         /// Defines the entry point of the application.
         /// </summary>
+        [STAThread]
         public static void Main()
         {
             var options = new StartupOptions(Environment.GetCommandLineArgs());
@@ -86,8 +69,6 @@ namespace MediaBrowser.ServerApplication
 
             ApplicationPath = currentProcess.MainModule.FileName;
             var architecturePath = Path.Combine(Path.GetDirectoryName(ApplicationPath), Environment.Is64BitProcess ? "x64" : "x86");
-
-            Wand.SetMagickCoderModulePath(architecturePath);
 
             var success = SetDllDirectory(architecturePath);
 
@@ -202,7 +183,7 @@ namespace MediaBrowser.ServerApplication
             {
                 _logger.Info("Found a duplicate process. Giving it time to exit.");
 
-                if (!duplicate.WaitForExit(30000))
+                if (!duplicate.WaitForExit(40000))
                 {
                     _logger.Info("The duplicate process did not exit.");
                     return true;
@@ -259,16 +240,18 @@ namespace MediaBrowser.ServerApplication
 
             var resourcesPath = Path.GetDirectoryName(applicationPath);
 
+            Action<string> createDirectoryFn = s => Directory.CreateDirectory(s);
+
             if (runAsService)
             {
                 var systemPath = Path.GetDirectoryName(applicationPath);
 
                 var programDataPath = Path.GetDirectoryName(systemPath);
 
-                return new ServerApplicationPaths(programDataPath, appFolderPath, resourcesPath);
+                return new ServerApplicationPaths(programDataPath, appFolderPath, resourcesPath, createDirectoryFn);
             }
 
-            return new ServerApplicationPaths(ApplicationPathHelper.GetProgramDataPath(applicationPath), appFolderPath, resourcesPath);
+            return new ServerApplicationPaths(ApplicationPathHelper.GetProgramDataPath(applicationPath), appFolderPath, resourcesPath, createDirectoryFn);
         }
 
         /// <summary>
@@ -313,8 +296,6 @@ namespace MediaBrowser.ServerApplication
             }
         }
 
-        private static readonly TaskCompletionSource<bool> ApplicationTaskCompletionSource = new TaskCompletionSource<bool>();
-
         /// <summary>
         /// Runs the application.
         /// </summary>
@@ -324,11 +305,11 @@ namespace MediaBrowser.ServerApplication
         /// <param name="options">The options.</param>
         private static void RunApplication(ServerApplicationPaths appPaths, ILogManager logManager, bool runService, StartupOptions options)
         {
-            var fileSystem = new ManagedFileSystem(logManager.GetLogger("FileSystem"), true, true, true, appPaths.TempDirectory);
-            fileSystem.AddShortcutHandler(new LnkShortcutHandler());
-            fileSystem.AddShortcutHandler(new MbLinkShortcutHandler(fileSystem));
+            var environmentInfo = new EnvironmentInfo();
 
-            var imageEncoder = ImageEncoderHelper.GetImageEncoder(_logger, logManager, fileSystem, options, () => _appHost.HttpClient, appPaths);
+            var fileSystem = new ManagedFileSystem(logManager.GetLogger("FileSystem"), environmentInfo, appPaths.TempDirectory);
+
+            FileSystem = fileSystem;
 
             _appHost = new WindowsAppHost(appPaths,
                 logManager,
@@ -336,10 +317,10 @@ namespace MediaBrowser.ServerApplication
                 fileSystem,
                 new PowerManagement(),
                 "emby.windows.zip",
-                new EnvironmentInfo(),
-                imageEncoder,
-                new Server.Startup.Common.SystemEvents(logManager.GetLogger("SystemEvents")),
-                new RecyclableMemoryStreamProvider(),
+                environmentInfo,
+                new NullImageEncoder(),
+                new SystemEvents(logManager.GetLogger("SystemEvents")),
+                new MemoryStreamProvider(),
                 new Networking.NetworkManager(logManager.GetLogger("NetworkManager")),
                 GenerateCertificate,
                 () => Environment.UserDomainName);
@@ -358,6 +339,19 @@ namespace MediaBrowser.ServerApplication
             var task = _appHost.Init(initProgress);
             Task.WaitAll(task);
 
+            if (!runService)
+            {
+                task = InstallVcredist2013IfNeeded(_appHost, _logger);
+                Task.WaitAll(task);
+
+                // needed by skia
+                task = InstallVcredist2015IfNeeded(_appHost, _logger);
+                Task.WaitAll(task);
+            }
+
+            // set image encoder here
+            _appHost.ImageProcessor.ImageEncoder = ImageEncoderHelper.GetImageEncoder(_logger, logManager, fileSystem, options, () => _appHost.HttpClient, appPaths);
+
             task = task.ContinueWith(new Action<Task>(a => _appHost.RunStartupTasks()), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.AttachedToParent);
 
             if (runService)
@@ -368,23 +362,17 @@ namespace MediaBrowser.ServerApplication
             {
                 Task.WaitAll(task);
 
-                task = InstallVcredist2013IfNeeded(_appHost, _logger);
-                Task.WaitAll(task);
-
                 Microsoft.Win32.SystemEvents.SessionSwitch += SystemEvents_SessionSwitch;
 
                 HideSplashScreen();
 
                 ShowTrayIcon();
-
-                task = ApplicationTaskCompletionSource.Task;
-                Task.WaitAll(task);
             }
         }
 
-        private static void GenerateCertificate(string certPath, string certHost)
+        private static void GenerateCertificate(string certPath, string certHost, string certPassword)
         {
-            CertificateGenerator.CreateSelfSignCertificatePfx(certPath, certHost, _logger);
+            CertificateGenerator.CreateSelfSignCertificatePfx(certPath, certHost, certPassword, _logger);
         }
 
         private static ServerNotifyIcon _serverNotifyIcon;
@@ -469,7 +457,6 @@ namespace MediaBrowser.ServerApplication
         /// <param name="e">The <see cref="EventArgs"/> instance containing the event data.</param>
         static void service_Disposed(object sender, EventArgs e)
         {
-            ApplicationTaskCompletionSource.SetResult(true);
             OnServiceShutdown();
         }
 
@@ -580,7 +567,7 @@ namespace MediaBrowser.ServerApplication
         {
             var exception = (Exception)e.ExceptionObject;
 
-            new UnhandledExceptionWriter(_appHost.ServerConfigurationManager.ApplicationPaths, _logger, _appHost.LogManager).Log(exception);
+            new UnhandledExceptionWriter(_appHost.ServerConfigurationManager.ApplicationPaths, _logger, _appHost.LogManager, FileSystem, new ConsoleLogger()).Log(exception);
 
             if (!IsRunningAsService)
             {
@@ -676,6 +663,7 @@ namespace MediaBrowser.ServerApplication
 
                 _appHostDisposed = true;
                 _appHost.Dispose();
+                _logger.Info("App host dispose complete");
             }
         }
 
@@ -687,14 +675,10 @@ namespace MediaBrowser.ServerApplication
                 _serverNotifyIcon = null;
             }
 
-            //_logger.Info("Calling Application.Exit");
+            _logger.Info("Calling Application.Exit");
             //Application.Exit();
 
-            _logger.Info("Calling Environment.Exit");
             Environment.Exit(0);
-
-            _logger.Info("Calling ApplicationTaskCompletionSource.SetResult");
-            ApplicationTaskCompletionSource.SetResult(true);
         }
 
         private static void ShutdownWindowsService()
@@ -724,31 +708,6 @@ namespace MediaBrowser.ServerApplication
                 Arguments = String.Format("/c sc stop {0} & sc start {0} & sc start {0}", BackgroundService.GetExistingServiceName())
             };
             Process.Start(startInfo);
-        }
-
-        private static bool CanRestartWindowsService()
-        {
-            var startInfo = new ProcessStartInfo
-            {
-                FileName = "cmd.exe",
-                CreateNoWindow = true,
-                WindowStyle = ProcessWindowStyle.Hidden,
-                Verb = "runas",
-                ErrorDialog = false,
-                Arguments = String.Format("/c sc query {0}", BackgroundService.GetExistingServiceName())
-            };
-            using (var process = Process.Start(startInfo))
-            {
-                process.WaitForExit();
-                if (process.ExitCode == 0)
-                {
-                    return true;
-                }
-                else
-                {
-                    return false;
-                }
-            }
         }
 
         private static async Task InstallVcredist2013IfNeeded(ApplicationHost appHost, ILogger logger)
@@ -783,7 +742,7 @@ namespace MediaBrowser.ServerApplication
 
             try
             {
-                await InstallVcredist2013().ConfigureAwait(false);
+                await InstallVcredist(GetVcredist2013Url()).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -791,13 +750,101 @@ namespace MediaBrowser.ServerApplication
             }
         }
 
-        private async static Task InstallVcredist2013()
+        private static string GetVcredist2013Url()
+        {
+            if (Environment.Is64BitProcess)
+            {
+                return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_x64.exe";
+            }
+
+            // TODO: ARM url - https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_arm.exe
+
+            return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_x86.exe";
+        }
+
+        private static async Task InstallVcredist2015IfNeeded(ApplicationHost appHost, ILogger logger)
+        {
+            // Reference 
+            // http://stackoverflow.com/questions/12206314/detect-if-visual-c-redistributable-for-visual-studio-2012-is-installed
+
+            try
+            {
+                RegistryKey key;
+
+                if (Environment.Is64BitProcess)
+                {
+                    key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
+                       .OpenSubKey("SOFTWARE\\Classes\\Installer\\Dependencies\\{d992c12e-cab2-426f-bde3-fb8c53950b0d}");
+
+                    if (key == null)
+                    {
+                        key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
+                            .OpenSubKey("SOFTWARE\\WOW6432Node\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x64");
+                    }
+                }
+                else
+                {
+                    key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
+                        .OpenSubKey("SOFTWARE\\Classes\\Installer\\Dependencies\\{e2803110-78b3-4664-a479-3611a381656a}");
+
+                    if (key == null)
+                    {
+                        key = RegistryKey.OpenBaseKey(RegistryHive.LocalMachine, RegistryView.Default)
+                            .OpenSubKey("SOFTWARE\\Microsoft\\VisualStudio\\14.0\\VC\\Runtimes\\x86");
+                    }
+                }
+
+                if (key != null)
+                {
+                    using (key)
+                    {
+                        var version = key.GetValue("Version");
+                        if (version != null)
+                        {
+                            var installedVersion = ((string)version).TrimStart('v');
+                            if (installedVersion.StartsWith("14", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.ErrorException("Error getting .NET Framework version", ex);
+                return;
+            }
+
+            try
+            {
+                await InstallVcredist(GetVcredist2015Url()).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                logger.ErrorException("Error installing Visual Studio C++ runtime", ex);
+            }
+        }
+
+        private static string GetVcredist2015Url()
+        {
+            if (Environment.Is64BitProcess)
+            {
+                return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2015/vc_redist.x64.exe";
+            }
+
+            // TODO: ARM url - https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2015/vcredist_arm.exe
+
+            return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2015/vc_redist.x86.exe";
+        }
+
+        private async static Task InstallVcredist(string url)
         {
             var httpClient = _appHost.HttpClient;
 
             var tmp = await httpClient.GetTempFile(new HttpRequestOptions
             {
-                Url = GetVcredist2013Url(),
+                Url = url,
                 Progress = new Progress<double>()
 
             }).ConfigureAwait(false);
@@ -821,18 +868,6 @@ namespace MediaBrowser.ServerApplication
             {
                 process.WaitForExit();
             }
-        }
-
-        private static string GetVcredist2013Url()
-        {
-            if (Environment.Is64BitProcess)
-            {
-                return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_x64.exe";
-            }
-
-            // TODO: ARM url - https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_arm.exe
-
-            return "https://github.com/MediaBrowser/Emby.Resources/raw/master/vcredist2013/vcredist_x86.exe";
         }
 
         /// <summary>

@@ -8,7 +8,7 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Globalization;
@@ -46,15 +46,15 @@ namespace MediaBrowser.Providers.TV
 
                 //await series.RefreshMetadata(new MetadataRefreshOptions(directoryService), cancellationToken).ConfigureAwait(false);
 
-                //await series.ValidateChildren(new Progress<double>(), cancellationToken, new MetadataRefreshOptions(directoryService))
+                //await series.ValidateChildren(new SimpleProgress<double>(), cancellationToken, new MetadataRefreshOptions(directoryService))
                 //    .ConfigureAwait(false);
             }
         }
 
         private async Task<bool> AddDummySeasonFolders(Series series, CancellationToken cancellationToken)
         {
-            var episodesInSeriesFolder = series.GetRecursiveChildren()
-                .OfType<Episode>()
+            var episodesInSeriesFolder = series.GetRecursiveChildren(i => i is Episode)
+                .Cast<Episode>()
                 .Where(i => !i.IsInSeasonFolder)
                 .ToList();
 
@@ -125,8 +125,7 @@ namespace MediaBrowser.Providers.TV
                 Id = _libraryManager.GetNewItemId((series.Id + (seasonNumber ?? -1).ToString(_usCulture) + seasonName), typeof(Season)),
                 IsVirtualItem = isVirtualItem,
                 SeriesId = series.Id,
-                SeriesName = series.Name,
-                SeriesSortName = series.SortName
+                SeriesName = series.Name
             };
 
             season.SetParent(series);

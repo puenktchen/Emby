@@ -14,7 +14,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using MediaBrowser.Common.IO;
+using MediaBrowser.Controller.Dto;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.IO;
@@ -114,7 +114,11 @@ namespace MediaBrowser.Providers.TV
             {
                 IncludeItemTypes = new[] { typeof(Series).Name },
                 Recursive = true,
-                GroupByPresentationUniqueKey = false
+                GroupByPresentationUniqueKey = false,
+                DtoOptions = new DtoOptions(false)
+                {
+                    EnableImages = false
+                }
 
             }).Cast<Series>()
             .ToList();
@@ -143,7 +147,6 @@ namespace MediaBrowser.Providers.TV
                     Url = ServerTimeUrl,
                     CancellationToken = cancellationToken,
                     EnableHttpCompression = true,
-                    ResourcePool = TvdbSeriesProvider.Current.TvDbResourcePool,
                     BufferContent = false
 
                 }).ConfigureAwait(false))
@@ -240,7 +243,6 @@ namespace MediaBrowser.Providers.TV
                 Url = string.Format(UpdatesUrl, lastUpdateTime),
                 CancellationToken = cancellationToken,
                 EnableHttpCompression = true,
-                ResourcePool = TvdbSeriesProvider.Current.TvDbResourcePool,
                 BufferContent = false
 
             }).ConfigureAwait(false))
@@ -318,16 +320,19 @@ namespace MediaBrowser.Providers.TV
         /// <param name="progress">The progress.</param>
         /// <param name="cancellationToken">The cancellation token.</param>
         /// <returns>Task.</returns>
-        private async Task UpdateSeries(IEnumerable<string> seriesIds, string seriesDataPath, long? lastTvDbUpdateTime, IProgress<double> progress, CancellationToken cancellationToken)
+        private async Task UpdateSeries(List<string> seriesIds, string seriesDataPath, long? lastTvDbUpdateTime, IProgress<double> progress, CancellationToken cancellationToken)
         {
-            var list = seriesIds.ToList();
             var numComplete = 0;
 
             var seriesList = _libraryManager.GetItemList(new InternalItemsQuery()
             {
                 IncludeItemTypes = new[] { typeof(Series).Name },
                 Recursive = true,
-                GroupByPresentationUniqueKey = false
+                GroupByPresentationUniqueKey = false,
+                DtoOptions = new DtoOptions(false)
+                {
+                    EnableImages = false
+                }
 
             }).Cast<Series>();
 
@@ -336,7 +341,7 @@ namespace MediaBrowser.Providers.TV
                 .Where(i => !string.IsNullOrEmpty(i.GetProviderId(MetadataProviders.Tvdb)))
                 .ToLookup(i => i.GetProviderId(MetadataProviders.Tvdb));
 
-            foreach (var seriesId in list)
+            foreach (var seriesId in seriesIds)
             {
                 // Find the preferred language(s) for the movie in the library
                 var languages = allSeries[seriesId]
@@ -365,7 +370,7 @@ namespace MediaBrowser.Providers.TV
 
                 numComplete++;
                 double percent = numComplete;
-                percent /= list.Count;
+                percent /= seriesIds.Count;
                 percent *= 100;
 
                 progress.Report(percent);
@@ -389,7 +394,7 @@ namespace MediaBrowser.Providers.TV
 
             _fileSystem.CreateDirectory(seriesDataPath);
 
-            return TvdbSeriesProvider.Current.DownloadSeriesZip(id, MetadataProviders.Tvdb.ToString(), seriesDataPath, lastTvDbUpdateTime, preferredMetadataLanguage, cancellationToken);
+            return TvdbSeriesProvider.Current.DownloadSeriesZip(id, MetadataProviders.Tvdb.ToString(), null, null, seriesDataPath, lastTvDbUpdateTime, preferredMetadataLanguage, cancellationToken);
         }
     }
 }

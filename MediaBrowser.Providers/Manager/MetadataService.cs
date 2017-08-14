@@ -45,10 +45,19 @@ namespace MediaBrowser.Providers.Manager
             var updateType = ItemUpdateType.None;
             var requiresRefresh = false;
 
+            var libraryOptions = LibraryManager.GetLibraryOptions((BaseItem)item);
+
             if (refreshOptions.MetadataRefreshMode != MetadataRefreshMode.None)
             {
                 // TODO: If this returns true, should we instead just change metadata refresh mode to Full?
                 requiresRefresh = item.RequiresRefresh();
+            }
+
+            if (!requiresRefresh &&
+                libraryOptions.AutomaticRefreshIntervalDays > 0 &&
+                (DateTime.UtcNow - item.DateLastRefreshed).TotalDays >= libraryOptions.AutomaticRefreshIntervalDays)
+            {
+                requiresRefresh = true;
             }
 
             var itemImageProvider = new ItemImageProvider(Logger, ProviderManager, ServerConfigurationManager, FileSystem);
@@ -116,8 +125,6 @@ namespace MediaBrowser.Providers.Manager
                 }
             }
 
-            LibraryOptions libraryOptions = null;
-
             // Next run remote image providers, but only if local image providers didn't throw an exception
             if (!localImagesFailed && refreshOptions.ImageRefreshMode != ImageRefreshMode.ValidationOnly)
             {
@@ -125,11 +132,6 @@ namespace MediaBrowser.Providers.Manager
 
                 if (providers.Count > 0)
                 {
-                    if (libraryOptions == null)
-                    {
-                        libraryOptions = LibraryManager.GetLibraryOptions((BaseItem)item);
-                    }
-
                     var result = await itemImageProvider.RefreshImages(itemOfType, libraryOptions, providers, refreshOptions, config, cancellationToken).ConfigureAwait(false);
 
                     updateType = updateType | result.UpdateType;
@@ -140,7 +142,7 @@ namespace MediaBrowser.Providers.Manager
                 }
             }
 
-            var beforeSaveResult = await BeforeSave(itemOfType, isFirstRefresh || refreshOptions.ReplaceAllMetadata || refreshOptions.MetadataRefreshMode == MetadataRefreshMode.FullRefresh || requiresRefresh, updateType).ConfigureAwait(false);
+            var beforeSaveResult = BeforeSave(itemOfType, isFirstRefresh || refreshOptions.ReplaceAllMetadata || refreshOptions.MetadataRefreshMode == MetadataRefreshMode.FullRefresh || requiresRefresh, updateType);
             updateType = updateType | beforeSaveResult;
 
             if (item.LocationType == LocationType.FileSystem)
@@ -177,11 +179,6 @@ namespace MediaBrowser.Providers.Manager
                     item.DateLastRefreshed = default(DateTime);
                 }
 
-                if (libraryOptions == null)
-                {
-                    libraryOptions = LibraryManager.GetLibraryOptions((BaseItem)item);
-                }
-
                 // Save to database
                 await SaveItem(metadataResult, libraryOptions, updateType, cancellationToken).ConfigureAwait(false);
             }
@@ -204,7 +201,7 @@ namespace MediaBrowser.Providers.Manager
             {
                 var baseItem = result.Item as BaseItem;
 
-                await LibraryManager.UpdatePeople(baseItem, result.People.ToList());
+                await LibraryManager.UpdatePeople(baseItem, result.People);
                 await SavePeopleMetadata(result.People, libraryOptions, cancellationToken).ConfigureAwait(false);
             }
             await result.Item.UpdateToRepository(reason, cancellationToken).ConfigureAwait(false);
@@ -253,7 +250,7 @@ namespace MediaBrowser.Providers.Manager
             {
                 try
                 {
-                    await ProviderManager.SaveImage(personEntity, imageUrl, null, ImageType.Primary, null, cancellationToken).ConfigureAwait(false);
+                    await ProviderManager.SaveImage(personEntity, imageUrl, ImageType.Primary, null, cancellationToken).ConfigureAwait(false);
                     return;
                 }
                 catch (Exception ex)
@@ -284,7 +281,7 @@ namespace MediaBrowser.Providers.Manager
         /// <param name="isFullRefresh">if set to <c>true</c> [is full refresh].</param>
         /// <param name="currentUpdateType">Type of the current update.</param>
         /// <returns>ItemUpdateType.</returns>
-        protected virtual async Task<ItemUpdateType> BeforeSave(TItemType item, bool isFullRefresh, ItemUpdateType currentUpdateType)
+        protected virtual ItemUpdateType BeforeSave(TItemType item, bool isFullRefresh, ItemUpdateType currentUpdateType)
         {
             var updateType = ItemUpdateType.None;
 
@@ -305,13 +302,6 @@ namespace MediaBrowser.Providers.Manager
                 updateType |= ItemUpdateType.MetadataImport;
             }
 
-            var inheritedTags = item.GetInheritedTags();
-            if (!inheritedTags.SequenceEqual(item.InheritedTags, StringComparer.Ordinal))
-            {
-                item.InheritedTags = inheritedTags;
-                updateType |= ItemUpdateType.MetadataImport;
-            }
-
             return updateType;
         }
 
@@ -324,7 +314,7 @@ namespace MediaBrowser.Providers.Manager
                 var folder = item as Folder;
                 if (folder != null && folder.SupportsCumulativeRunTimeTicks)
                 {
-                    var items = folder.GetRecursiveChildren(i => !i.IsFolder).ToList();
+                    var items = folder.GetRecursiveChildren(i => !i.IsFolder);
                     var ticks = items.Select(i => i.RunTimeTicks ?? 0).Sum();
 
                     if (!folder.RunTimeTicks.HasValue || folder.RunTimeTicks.Value != ticks)
@@ -371,7 +361,7 @@ namespace MediaBrowser.Providers.Manager
 
             // Run all if either of these flags are true
             var runAllProviders = options.ReplaceAllMetadata ||
-                metadataRefreshMode == MetadataRefreshMode.FullRefresh || 
+                metadataRefreshMode == MetadataRefreshMode.FullRefresh ||
                 (isFirstRefresh && metadataRefreshMode >= MetadataRefreshMode.Default) ||
                 (requiresRefresh && metadataRefreshMode >= MetadataRefreshMode.Default);
 
@@ -529,7 +519,7 @@ namespace MediaBrowser.Providers.Manager
                             userDataList.AddRange(localItem.UserDataList);
                         }
 
-                        MergeData(localItem, temp, new List<MetadataFields>(), !options.ReplaceAllMetadata, true);
+                        MergeData(localItem, temp, new MetadataFields[]{}, !options.ReplaceAllMetadata, true);
                         refreshResult.UpdateType = refreshResult.UpdateType | ItemUpdateType.MetadataImport;
 
                         // Only one local provider allowed per item
@@ -577,7 +567,7 @@ namespace MediaBrowser.Providers.Manager
                     else
                     {
                         // TODO: If the new metadata from above has some blank data, this can cause old data to get filled into those empty fields
-                        MergeData(metadata, temp, new List<MetadataFields>(), false, false);
+                        MergeData(metadata, temp, new MetadataFields[]{}, false, false);
                         MergeData(temp, metadata, item.LockedFields, true, false);
                     }
                 }
@@ -714,7 +704,7 @@ namespace MediaBrowser.Providers.Manager
 
             foreach (var result in results)
             {
-                MergeData(result, temp, new List<MetadataFields>(), false, false);
+                MergeData(result, temp, new MetadataFields[]{}, false, false);
             }
 
             return refreshResult;
@@ -746,7 +736,7 @@ namespace MediaBrowser.Providers.Manager
 
         protected abstract void MergeData(MetadataResult<TItemType> source,
             MetadataResult<TItemType> target,
-            List<MetadataFields> lockedFields,
+            MetadataFields[] lockedFields,
             bool replaceData,
             bool mergeMetadataSettings);
 

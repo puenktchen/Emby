@@ -7,12 +7,14 @@ using System.Threading.Tasks;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Events;
 using MediaBrowser.Common.Extensions;
+using MediaBrowser.Common.Progress;
 using MediaBrowser.Model.Events;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Serialization;
 using MediaBrowser.Model.System;
 using MediaBrowser.Model.Tasks;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Common.Implementations.ScheduledTasks
 {
@@ -158,7 +160,7 @@ namespace Emby.Common.Implementations.ScheduledTasks
                 _lastExecutionResult = value;
 
                 var path = GetHistoryFilePath();
-				_fileSystem.CreateDirectory(Path.GetDirectoryName(path));
+				_fileSystem.CreateDirectory(_fileSystem.GetDirectoryName(path));
 
                 lock (_lastExecutionResultSyncLock)
                 {
@@ -273,7 +275,8 @@ namespace Emby.Common.Implementations.ScheduledTasks
         {
             get
             {
-                return InternalTriggers.Select(i => i.Item1).ToArray();
+                var triggers = InternalTriggers;
+                return triggers.Select(i => i.Item1).ToArray(triggers.Length);
             }
             set
             {
@@ -287,7 +290,7 @@ namespace Emby.Common.Implementations.ScheduledTasks
 
                 SaveTriggers(triggerList);
 
-                InternalTriggers = triggerList.Select(i => new Tuple<TaskTriggerInfo, ITaskTrigger>(i, GetTrigger(i))).ToArray();
+                InternalTriggers = triggerList.Select(i => new Tuple<TaskTriggerInfo, ITaskTrigger>(i, GetTrigger(i))).ToArray(triggerList.Length);
             }
         }
 
@@ -379,7 +382,7 @@ namespace Emby.Common.Implementations.ScheduledTasks
         /// <exception cref="System.InvalidOperationException">Cannot execute a Task that is already running</exception>
         public async Task Execute(TaskExecutionOptions options)
         {
-            var task = ExecuteInternal(options);
+            var task = Task.Run(async () => await ExecuteInternal(options).ConfigureAwait(false));
 
             _currentTask = task;
 
@@ -402,7 +405,7 @@ namespace Emby.Common.Implementations.ScheduledTasks
                 throw new InvalidOperationException("Cannot execute a Task that is already running");
             }
 
-            var progress = new Progress<double>();
+            var progress = new SimpleProgress<double>();
 
             CurrentCancellationTokenSource = new CancellationTokenSource();
 
@@ -575,7 +578,7 @@ namespace Emby.Common.Implementations.ScheduledTasks
         {
             var path = GetConfigurationFilePath();
 
-			_fileSystem.CreateDirectory(Path.GetDirectoryName(path));
+			_fileSystem.CreateDirectory(_fileSystem.GetDirectoryName(path));
 
             JsonSerializer.SerializeToFile(triggers, path);
         }

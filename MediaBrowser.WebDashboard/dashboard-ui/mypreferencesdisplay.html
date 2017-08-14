@@ -1,6 +1,22 @@
 ﻿<div id="displayPreferencesPage" data-role="page" class="page libraryPage userPreferencesPage noSecondaryNavPage" data-title="${HeaderDisplaySettings}" data-backbutton="true">
-    <div data-role="content">
+    <div class="padded-left padded-right padded-bottom-page">
         <form class="displayPreferencesForm userProfileSettingsForm" style="margin: 0 auto;">
+            <div class="detailSection">
+                <h1>
+                    ${Themes}
+                </h1>
+                <br />
+                <div class="selectContainer">
+                    <select id="selectTheme" is="emby-select" label="${LabelTheme}">
+                    </select>
+                    <div class="fieldDescription">${FeatureRequiresEmbyPremiere}</div>
+                </div>
+                <div class="selectContainer selectDashboardThemeContainer hide">
+                    <select id="selectDashboardTheme" is="emby-select" label="${LabelDashboardTheme}">
+                    </select>
+                    <div class="fieldDescription">${FeatureRequiresEmbyPremiere}</div>
+                </div>
+            </div>
             <div class="detailSection languageSection hide">
                 <h1>
                     ${HeaderLanguage}
@@ -30,6 +46,7 @@
                         <option value="it">Italian</option>
                         <option value="kk">Kazakh</option>
                         <option value="nb">Norwegian Bokmål</option>
+                        <option value="fa">Persian</option>
                         <option value="pl">Polish</option>
                         <option value="pt-BR">Portuguese (Brazil)</option>
                         <option value="pt-PT">Portuguese (Portugal)</option>
@@ -45,7 +62,7 @@
                     <div class="fieldDescription">
                         <div>${LabelPreferredDisplayLanguageHelp}</div>
                         <div style="margin-top: .25em;">
-                            <a href="http://emby.media/community/index.php?/topic/5727-join-our-translation-team/" target="_blank">${LabelReadHowYouCanContribute}</a>
+                            <a is="emby-linkbutton" class="button-link" href="http://emby.media/community/index.php?/topic/5727-join-our-translation-team/" target="_blank">${LabelReadHowYouCanContribute}</a>
                         </div>
                     </div>
                 </div>
@@ -70,7 +87,7 @@
                     <div class="fieldDescription checkboxFieldDescription">${LabelEnableThemeSongsHelp}</div>
                 </div>
             </div>
-            <div class="detailSection requiresUserPreferences">
+            <div class="detailSection">
                 <h1>
                     ${HeaderDisplay}
                 </h1>
@@ -82,10 +99,6 @@
                     </label>
                     <div class="fieldDescription checkboxFieldDescription">${LabelDisplayMissingEpisodesWithinSeasonsHelp}</div>
                 </div>
-                <label class="checkboxContainer">
-                    <input type="checkbox" is="emby-checkbox" class="chkDisplayUnairedEpisodes" />
-                    <span>${LabelUnairedMissingEpisodesWithinSeasons}</span>
-                </label>
             </div>
             <button is="emby-button" type="submit" class="raised button-submit block btnSave hide">
                 <span>${ButtonSave}</span>

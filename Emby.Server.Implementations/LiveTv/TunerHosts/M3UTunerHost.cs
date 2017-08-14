@@ -1,5 +1,4 @@
-﻿using MediaBrowser.Common.Configuration;
-using MediaBrowser.Common.Extensions;
+﻿using MediaBrowser.Common.Extensions;
 using MediaBrowser.Controller.LiveTv;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
@@ -11,29 +10,27 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Configuration;
-using MediaBrowser.Controller.IO;
 using MediaBrowser.Controller.MediaEncoding;
 using MediaBrowser.Model.Serialization;
+using MediaBrowser.Model.System;
 
 namespace Emby.Server.Implementations.LiveTv.TunerHosts
 {
     public class M3UTunerHost : BaseTunerHost, ITunerHost, IConfigurableTunerHost
     {
-        private readonly IFileSystem _fileSystem;
         private readonly IHttpClient _httpClient;
         private readonly IServerApplicationHost _appHost;
+        private readonly IEnvironmentInfo _environment;
 
-        public M3UTunerHost(IServerConfigurationManager config, ILogger logger, IJsonSerializer jsonSerializer, IMediaEncoder mediaEncoder, IFileSystem fileSystem, IHttpClient httpClient, IServerApplicationHost appHost)
-            : base(config, logger, jsonSerializer, mediaEncoder)
+        public M3UTunerHost(IServerConfigurationManager config, ILogger logger, IJsonSerializer jsonSerializer, IMediaEncoder mediaEncoder, IFileSystem fileSystem, IHttpClient httpClient, IServerApplicationHost appHost, IEnvironmentInfo environment) : base(config, logger, jsonSerializer, mediaEncoder, fileSystem)
         {
-            _fileSystem = fileSystem;
             _httpClient = httpClient;
             _appHost = appHost;
+            _environment = environment;
         }
 
         public override string Type
@@ -46,11 +43,18 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
             get { return "M3U Tuner"; }
         }
 
-        private const string ChannelIdPrefix = "m3u_";
-
-        protected override async Task<IEnumerable<ChannelInfo>> GetChannelsInternal(TunerHostInfo info, CancellationToken cancellationToken)
+        private string GetFullChannelIdPrefix(TunerHostInfo info)
         {
-            return await new M3uParser(Logger, _fileSystem, _httpClient, _appHost).Parse(info.Url, ChannelIdPrefix, info.Id, !info.EnableTvgId, cancellationToken).ConfigureAwait(false);
+            return ChannelIdPrefix + info.Url.GetMD5().ToString("N");
+        }
+
+        protected override async Task<List<ChannelInfo>> GetChannelsInternal(TunerHostInfo info, CancellationToken cancellationToken)
+        {
+            var channelIdPrefix = GetFullChannelIdPrefix(info);
+
+            var result = await new M3uParser(Logger, FileSystem, _httpClient, _appHost).Parse(info.Url, channelIdPrefix, info.Id, cancellationToken).ConfigureAwait(false);
+
+            return result.Cast<ChannelInfo>().ToList();
         }
 
         public Task<List<LiveTvTunerInfo>> GetTunerInfos(CancellationToken cancellationToken)
@@ -73,33 +77,23 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
         {
             var sources = await GetChannelStreamMediaSources(info, channelId, cancellationToken).ConfigureAwait(false);
 
-            var liveStream = new LiveStream(sources.First());
+            var liveStream = new LiveStream(sources.First(), _environment, FileSystem);
             return liveStream;
         }
 
         public async Task Validate(TunerHostInfo info)
         {
-            using (var stream = await new M3uParser(Logger, _fileSystem, _httpClient, _appHost).GetListingsStream(info.Url, CancellationToken.None).ConfigureAwait(false))
+            using (var stream = await new M3uParser(Logger, FileSystem, _httpClient, _appHost).GetListingsStream(info.Url, CancellationToken.None).ConfigureAwait(false))
             {
 
             }
-        }
-
-        protected override bool IsValidChannelId(string channelId)
-        {
-            if (string.IsNullOrWhiteSpace(channelId))
-            {
-                throw new ArgumentNullException("channelId");
-            }
-
-            return channelId.StartsWith(ChannelIdPrefix, StringComparison.OrdinalIgnoreCase);
         }
 
         protected override async Task<List<MediaSourceInfo>> GetChannelStreamMediaSources(TunerHostInfo info, string channelId, CancellationToken cancellationToken)
         {
-            var urlHash = info.Url.GetMD5().ToString("N");
-            var prefix = ChannelIdPrefix + urlHash;
-            if (!channelId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            var channelIdPrefix = GetFullChannelIdPrefix(info);
+
+            if (!channelId.StartsWith(channelIdPrefix, StringComparison.OrdinalIgnoreCase))
             {
                 return null;
             }
@@ -155,13 +149,15 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                     },
                     RequiresOpening = true,
                     RequiresClosing = true,
+                    RequiresLooping = info.EnableStreamLooping,
 
                     ReadAtNativeFramerate = false,
 
                     Id = channel.Path.GetMD5().ToString("N"),
                     IsInfiniteStream = true,
-                    SupportsDirectStream = false,
-                    IsRemote = true
+                    IsRemote = true,
+
+                    IgnoreDts = true
                 };
 
                 mediaSource.InferTotalBitrate();
@@ -174,6 +170,11 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
         protected override Task<bool> IsAvailableInternal(TunerHostInfo tuner, string channelId, CancellationToken cancellationToken)
         {
             return Task.FromResult(true);
+        }
+
+        public Task<List<TunerHostInfo>> DiscoverDevices(int discoveryDurationMs, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(new List<TunerHostInfo>());
         }
     }
 }

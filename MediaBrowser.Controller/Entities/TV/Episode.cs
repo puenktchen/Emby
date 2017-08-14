@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Serialization;
 
 namespace MediaBrowser.Controller.Entities.TV
@@ -16,14 +17,14 @@ namespace MediaBrowser.Controller.Entities.TV
     {
         public Episode()
         {
-            RemoteTrailers = new List<MediaUrl>();
-            LocalTrailerIds = new List<Guid>();
-            RemoteTrailerIds = new List<Guid>();
+            RemoteTrailers = EmptyMediaUrlArray;
+            LocalTrailerIds = EmptyGuidArray;
+            RemoteTrailerIds = EmptyGuidArray;
         }
 
-        public List<Guid> LocalTrailerIds { get; set; }
-        public List<Guid> RemoteTrailerIds { get; set; }
-        public List<MediaUrl> RemoteTrailers { get; set; }
+        public Guid[] LocalTrailerIds { get; set; }
+        public Guid[] RemoteTrailerIds { get; set; }
+        public MediaUrl[] RemoteTrailers { get; set; }
 
         /// <summary>
         /// Gets the season in which it aired.
@@ -56,13 +57,10 @@ namespace MediaBrowser.Controller.Entities.TV
         /// <value>The index number.</value>
         public int? IndexNumberEnd { get; set; }
 
-        [IgnoreDataMember]
-        public string SeriesSortName { get; set; }
-
         public string FindSeriesSortName()
         {
             var series = Series;
-            return series == null ? SeriesSortName : series.SortName;
+            return series == null ? SeriesName : series.SortName;
         }
 
         [IgnoreDataMember]
@@ -114,6 +112,14 @@ namespace MediaBrowser.Controller.Entities.TV
             {
                 return false;
             }
+        }
+
+        public override double? GetDefaultPrimaryImageAspectRatio()
+        {
+            double value = 16;
+            value /= 9;
+
+            return value;
         }
 
         public override List<string> GetUserDataKeys()
@@ -276,14 +282,8 @@ namespace MediaBrowser.Controller.Entities.TV
         {
             get
             {
-                return LocationType == LocationType.Virtual && !IsUnaired;
+                return LocationType == LocationType.Virtual;
             }
-        }
-
-        [IgnoreDataMember]
-        public bool IsVirtualUnaired
-        {
-            get { return LocationType == LocationType.Virtual && IsUnaired; }
         }
 
         [IgnoreDataMember]
@@ -311,9 +311,15 @@ namespace MediaBrowser.Controller.Entities.TV
             return list;
         }
 
-        public override IEnumerable<string> GetDeletePaths()
+        public override IEnumerable<FileSystemMetadata> GetDeletePaths()
         {
-            return new[] { Path };
+            return new[] {
+                new FileSystemMetadata
+                {
+                    FullName = Path,
+                    IsDirectory = IsFolder
+                }
+            }.Concat(GetLocalMetadataFilesToDelete());
         }
 
         public override UnratedItem GetBlockUnratedType()
@@ -330,12 +336,10 @@ namespace MediaBrowser.Controller.Entities.TV
             if (series != null)
             {
                 id.SeriesProviderIds = series.ProviderIds;
-                id.AnimeSeriesIndex = series.AnimeSeriesIndex;
             }
 
             id.IsMissingEpisode = IsMissingEpisode;
             id.IndexNumberEnd = IndexNumberEnd;
-            id.IsVirtualUnaired = IsVirtualUnaired;
 
             return id;
         }

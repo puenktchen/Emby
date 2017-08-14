@@ -66,8 +66,8 @@ namespace MediaBrowser.Api
             {
                 ParentalRatingOptions = _localizationManager.GetParentalRatings().ToList(),
                 ExternalIdInfos = _providerManager.GetExternalIdInfos(item).ToList(),
-                Countries = _localizationManager.GetCountries().ToList(),
-                Cultures = _localizationManager.GetCultures().ToList()
+                Countries = _localizationManager.GetCountries(),
+                Cultures = _localizationManager.GetCultures()
             };
 
             if (!item.IsVirtualItem && !(item is ICollectionFolder) && !(item is UserView) && !(item is AggregateFolder) && !(item is LiveTvChannel) && !(item is IItemByName) &&
@@ -206,14 +206,15 @@ namespace MediaBrowser.Api
             var newLockData = request.LockData ?? false;
             var isLockedChanged = item.IsLocked != newLockData;
 
-            UpdateItem(request, item);
-
-            await item.UpdateToRepository(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
-
+            // Do this first so that metadata savers can pull the updates from the database.
             if (request.People != null)
             {
                 await _libraryManager.UpdatePeople(item, request.People.Select(x => new PersonInfo { Name = x.Name, Role = x.Role, Type = x.Type }).ToList());
             }
+
+            UpdateItem(request, item);
+
+            await item.UpdateToRepository(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
             if (isLockedChanged && item.IsFolder)
             {
@@ -237,21 +238,11 @@ namespace MediaBrowser.Api
             item.Name = request.Name;
             item.ForcedSortName = request.ForcedSortName;
 
-            var hasBudget = item as IHasBudget;
-            if (hasBudget != null)
-            {
-                hasBudget.Budget = request.Budget;
-                hasBudget.Revenue = request.Revenue;
-            }
-
             item.OriginalTitle = string.IsNullOrWhiteSpace(request.OriginalTitle) ? null : request.OriginalTitle;
 
             item.CriticRating = request.CriticRating;
-            item.CriticRatingSummary = request.CriticRatingSummary;
 
-            item.DisplayMediaType = request.DisplayMediaType;
             item.CommunityRating = request.CommunityRating;
-            item.VoteCount = request.VoteCount;
             item.HomePageUrl = request.HomePageUrl;
             item.IndexNumber = request.IndexNumber;
             item.ParentIndexNumber = request.ParentIndexNumber;
@@ -276,13 +267,9 @@ namespace MediaBrowser.Api
                 item.Tagline = request.Taglines.FirstOrDefault();
             }
 
-            item.ShortOverview = request.ShortOverview;
-
-            item.Keywords = request.Keywords;
-
             if (request.Studios != null)
             {
-                item.Studios = request.Studios.Select(x => x.Name).ToList();
+                item.Studios = request.Studios.Select(x => x.Name).ToArray();
             }
 
             if (request.DateCreated.HasValue)
@@ -298,7 +285,7 @@ namespace MediaBrowser.Api
 
             if (request.ProductionLocations != null)
             {
-                item.ProductionLocations = request.ProductionLocations.ToList();
+                item.ProductionLocations = request.ProductionLocations;
             }
 
             item.PreferredMetadataCountryCode = request.PreferredMetadataCountryCode;
@@ -345,25 +332,6 @@ namespace MediaBrowser.Api
                 video.Video3DFormat = request.Video3DFormat;
             }
 
-            var hasMetascore = item as IHasMetascore;
-            if (hasMetascore != null)
-            {
-                hasMetascore.Metascore = request.Metascore;
-            }
-
-            var hasAwards = item as IHasAwards;
-            if (hasAwards != null)
-            {
-                hasAwards.AwardSummary = request.AwardSummary;
-            }
-
-            var game = item as Game;
-
-            if (game != null)
-            {
-                game.PlayersSupported = request.Players;
-            }
-
             if (request.AlbumArtists != null)
             {
                 var hasAlbumArtists = item as IHasAlbumArtist;
@@ -372,7 +340,7 @@ namespace MediaBrowser.Api
                     hasAlbumArtists.AlbumArtists = request
                         .AlbumArtists
                         .Select(i => i.Name)
-                        .ToList();
+                        .ToArray();
                 }
             }
 
@@ -403,10 +371,25 @@ namespace MediaBrowser.Api
             var series = item as Series;
             if (series != null)
             {
-                series.Status = request.SeriesStatus;
-                series.AirDays = request.AirDays;
-                series.AirTime = request.AirTime;
+                series.Status = GetSeriesStatus(request);
+
+                if (request.AirDays != null)
+                {
+                    series.AirDays = request.AirDays;
+                    series.AirTime = request.AirTime;
+                }
             }
+        }
+
+        private SeriesStatus? GetSeriesStatus(BaseItemDto item)
+        {
+            if (string.IsNullOrEmpty(item.Status))
+            {
+                return null;
+            }
+
+            return (SeriesStatus)Enum.Parse(typeof(SeriesStatus), item.Status, true);
+
         }
     }
 }

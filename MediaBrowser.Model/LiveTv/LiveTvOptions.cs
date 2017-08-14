@@ -1,13 +1,11 @@
 ﻿using System.Collections.Generic;
 using MediaBrowser.Model.Dto;
-using MediaBrowser.Model.Extensions;
 
 namespace MediaBrowser.Model.LiveTv
 {
     public class LiveTvOptions
     {
         public int? GuideDays { get; set; }
-        public bool EnableMovieProviders { get; set; }
         public string RecordingPath { get; set; }
         public string MovieRecordingPath { get; set; }
         public string SeriesRecordingPath { get; set; }
@@ -30,12 +28,12 @@ namespace MediaBrowser.Model.LiveTv
 
         public LiveTvOptions()
         {
-            EnableMovieProviders = true;
             TunerHosts = new List<TunerHostInfo>();
             ListingProviders = new List<ListingsProviderInfo>();
             MediaLocationsCreated = new string[] { };
-            RecordingEncodingFormat = "mp4";
+            RecordingEncodingFormat = "mkv";
             RecordingPostProcessorArguments = "\"{path}\"";
+            EnableRecordingEncoding = true;
         }
     }
 
@@ -45,23 +43,13 @@ namespace MediaBrowser.Model.LiveTv
         public string Url { get; set; }
         public string Type { get; set; }
         public string DeviceId { get; set; }
+        public string FriendlyName { get; set; }
         public bool ImportFavoritesOnly { get; set; }
         public bool AllowHWTranscoding { get; set; }
-        public bool IsEnabled { get; set; }
-        public string M3UUrl { get; set; }
-        public string InfoUrl { get; set; }
-        public string FriendlyName { get; set; }
-        public int Tuners { get; set; }
-        public string DiseqC { get; set; }
-        public string SourceA { get; set; }
-        public string SourceB { get; set; }
-        public string SourceC { get; set; }
-        public string SourceD { get; set; }
-        public bool EnableTvgId { get; set; }
+        public bool EnableStreamLooping { get; set; }
 
         public TunerHostInfo()
         {
-            IsEnabled = true;
             AllowHWTranscoding = true;
         }
     }
@@ -85,6 +73,8 @@ namespace MediaBrowser.Model.LiveTv
         public string[] MovieCategories { get; set; }
         public NameValuePair[] ChannelMappings { get; set; }
         public string MoviePrefix { get; set; }
+        public bool EnableNewProgramIds { get; set; }
+        public string PreferredLanguage { get; set; }
 
         public ListingsProviderInfo()
         {
@@ -95,18 +85,6 @@ namespace MediaBrowser.Model.LiveTv
             EnabledTuners = new string[] { };
             EnableAllTuners = true;
             ChannelMappings = new NameValuePair[] {};
-        }
-
-        public string GetMappedChannel(string channelNumber)
-        {
-            foreach (NameValuePair mapping in ChannelMappings)
-            {
-                if (StringHelper.EqualsIgnoreCase(mapping.Name, channelNumber))
-                {
-                    return mapping.Value;
-                }
-            }
-            return channelNumber;
         }
     }
 }

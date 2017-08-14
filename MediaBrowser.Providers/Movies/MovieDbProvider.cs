@@ -18,10 +18,11 @@ using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Common;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.Globalization;
 using MediaBrowser.Model.Net;
+using MediaBrowser.Model.Extensions;
 
 namespace MediaBrowser.Providers.Movies
 {
@@ -30,8 +31,6 @@ namespace MediaBrowser.Providers.Movies
     /// </summary>
     public class MovieDbProvider : IRemoteMetadataProvider<Movie, MovieInfo>, IDisposable, IHasOrder
     {
-        internal readonly SemaphoreSlim MovieDbResourcePool = new SemaphoreSlim(1, 1);
-
         internal static MovieDbProvider Current { get; private set; }
 
         private readonly IJsonSerializer _jsonSerializer;
@@ -137,10 +136,6 @@ namespace MediaBrowser.Providers.Movies
         /// <param name="dispose"><c>true</c> to release both managed and unmanaged resources; <c>false</c> to release only unmanaged resources.</param>
         protected virtual void Dispose(bool dispose)
         {
-            if (dispose)
-            {
-                MovieDbResourcePool.Dispose();
-            }
         }
 
         /// <summary>
@@ -214,7 +209,7 @@ namespace MediaBrowser.Providers.Movies
 
             var dataFilePath = GetDataFilePath(id, preferredMetadataLanguage);
 
-            _fileSystem.CreateDirectory(Path.GetDirectoryName(dataFilePath));
+            _fileSystem.CreateDirectory(_fileSystem.GetDirectoryName(dataFilePath));
 
             _jsonSerializer.SerializeToFile(mainResult, dataFilePath);
         }
@@ -288,7 +283,7 @@ namespace MediaBrowser.Providers.Movies
                 languages.Add("en");
             }
 
-            return string.Join(",", languages.ToArray());
+            return string.Join(",", languages.ToArray(languages.Count));
         }
 
         public static string NormalizeLanguage(string language)
@@ -431,7 +426,6 @@ namespace MediaBrowser.Providers.Movies
                 await Task.Delay(Convert.ToInt32(delayMs)).ConfigureAwait(false);
             }
 
-            options.ResourcePool = MovieDbResourcePool;
             _lastRequestTicks = DateTime.UtcNow.Ticks;
 
             options.BufferContent = true;

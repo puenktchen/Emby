@@ -10,8 +10,9 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.Configuration;
+using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Dto;
@@ -62,26 +63,13 @@ namespace MediaBrowser.Controller.Library
         /// <returns>BaseItem.</returns>
         BaseItem FindByPath(string path, bool? isFolder);
 
-        Guid? FindIdByPath(string path, bool? isFolder);
-
         /// <summary>
         /// Gets the artist.
         /// </summary>
         /// <param name="name">The name.</param>
         /// <returns>Task{Artist}.</returns>
         MusicArtist GetArtist(string name);
-        /// <summary>
-        /// Gets the album artists.
-        /// </summary>
-        /// <param name="items">The items.</param>
-        /// <returns>IEnumerable&lt;MusicArtist&gt;.</returns>
-        IEnumerable<MusicArtist> GetAlbumArtists(IEnumerable<IHasAlbumArtist> items);
-        /// <summary>
-        /// Gets the artists.
-        /// </summary>
-        /// <param name="items">The items.</param>
-        /// <returns>IEnumerable&lt;MusicArtist&gt;.</returns>
-        IEnumerable<MusicArtist> GetArtists(IEnumerable<IHasArtist> items);
+        MusicArtist GetArtist(string name, DtoOptions options);
         /// <summary>
         /// Gets a Studio
         /// </summary>
@@ -144,7 +132,9 @@ namespace MediaBrowser.Controller.Library
         /// Gets the default view.
         /// </summary>
         /// <returns>IEnumerable{VirtualFolderInfo}.</returns>
-        IEnumerable<VirtualFolderInfo> GetVirtualFolders();
+        List<VirtualFolderInfo> GetVirtualFolders();
+
+        List<VirtualFolderInfo> GetVirtualFolders(bool includeRefreshState);
 
         /// <summary>
         /// Gets the item by id.
@@ -193,13 +183,6 @@ namespace MediaBrowser.Controller.Library
         /// <returns>IEnumerable{BaseItem}.</returns>
         IEnumerable<BaseItem> Sort(IEnumerable<BaseItem> items, User user, IEnumerable<string> sortBy,
                                    SortOrder sortOrder);
-
-        /// <summary>
-        /// Ensure supplied item has only one instance throughout
-        /// </summary>
-        /// <param name="item">The item.</param>
-        /// <returns>The proper instance to the item</returns>
-        BaseItem GetOrAddByReferenceItem(BaseItem item);
 
         /// <summary>
         /// Gets the user root folder.
@@ -456,7 +439,9 @@ namespace MediaBrowser.Controller.Library
         /// </summary>
         /// <param name="item">The item.</param>
         /// <returns>IEnumerable&lt;Folder&gt;.</returns>
-        IEnumerable<Folder> GetCollectionFolders(BaseItem item);
+        List<Folder> GetCollectionFolders(BaseItem item);
+
+        List<Folder> GetCollectionFolders(BaseItem item, List<Folder> allUserRootChildren);
 
         LibraryOptions GetLibraryOptions(BaseItem item);
 
@@ -528,19 +513,21 @@ namespace MediaBrowser.Controller.Library
         /// <param name="image">The image.</param>
         /// <param name="imageIndex">Index of the image.</param>
         /// <returns>Task.</returns>
-        Task<ItemImageInfo> ConvertImageToLocal(IHasImages item, ItemImageInfo image, int imageIndex);
+        Task<ItemImageInfo> ConvertImageToLocal(IHasMetadata item, ItemImageInfo image, int imageIndex);
 
         /// <summary>
         /// Gets the items.
         /// </summary>
         /// <param name="query">The query.</param>
         /// <returns>QueryResult&lt;BaseItem&gt;.</returns>
-        IEnumerable<BaseItem> GetItemList(InternalItemsQuery query);
+        List<BaseItem> GetItemList(InternalItemsQuery query);
+
+        List<BaseItem> GetItemList(InternalItemsQuery query, bool allowExternalContent);
 
         /// <summary>
         /// Gets the items.
         /// </summary>
-        IEnumerable<BaseItem> GetItemList(InternalItemsQuery query, List<BaseItem> parents);
+        List<BaseItem> GetItemList(InternalItemsQuery query, List<BaseItem> parents);
 
         /// <summary>
         /// Gets the items result.
@@ -556,6 +543,14 @@ namespace MediaBrowser.Controller.Library
         /// <param name="parent">The parent.</param>
         /// <returns><c>true</c> if XXXX, <c>false</c> otherwise.</returns>
         bool IgnoreFile(FileSystemMetadata file, BaseItem parent);
+
+        Guid GetStudioId(string name);
+
+        Guid GetGenreId(string name);
+
+        Guid GetMusicGenreId(string name);
+
+        Guid GetGameGenreId(string name);
 
         void AddVirtualFolder(string name, string collectionType, LibraryOptions options, bool refreshLibrary);
         void RemoveVirtualFolder(string name, bool refreshLibrary);

@@ -18,6 +18,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading.Tasks;
 using System.Xml;
 using MediaBrowser.Controller.MediaEncoding;
 using MediaBrowser.Model.Configuration;
@@ -111,14 +112,14 @@ namespace Emby.Dlna.Didl
             }
         }
 
-        public void WriteItemElement(DlnaOptions options, 
-            XmlWriter writer, 
-            BaseItem item, 
+        public void WriteItemElement(DlnaOptions options,
+            XmlWriter writer,
+            BaseItem item,
             User user,
-            BaseItem context, 
-            StubType? contextStubType, 
-            string deviceId, 
-            Filter filter, 
+            BaseItem context,
+            StubType? contextStubType,
+            string deviceId,
+            Filter filter,
             StreamInfo streamInfo = null)
         {
             var clientId = GetClientId(item, null);
@@ -192,7 +193,7 @@ namespace Emby.Dlna.Didl
         {
             if (streamInfo == null)
             {
-                var sources = _mediaSourceManager.GetStaticMediaSources(video, true, _user).ToList();
+                var sources = _mediaSourceManager.GetStaticMediaSources(video, true, _user);
 
                 streamInfo = new StreamBuilder(_mediaEncoder, GetStreamBuilderLogger(options)).BuildVideoItem(new VideoOptions
                 {
@@ -208,7 +209,7 @@ namespace Emby.Dlna.Didl
             var targetHeight = streamInfo.TargetHeight;
 
             var contentFeatureList = new ContentFeatureBuilder(_profile).BuildVideoHeader(streamInfo.Container,
-                streamInfo.VideoCodec,
+                streamInfo.TargetVideoCodec,
                 streamInfo.TargetAudioCodec,
                 targetWidth,
                 targetHeight,
@@ -223,6 +224,7 @@ namespace Emby.Dlna.Didl
                 streamInfo.TargetPacketLength,
                 streamInfo.TranscodeSeekInfo,
                 streamInfo.IsTargetAnamorphic,
+                streamInfo.IsTargetInterlaced,
                 streamInfo.TargetRefFrames,
                 streamInfo.TargetVideoStreamCount,
                 streamInfo.TargetAudioStreamCount,
@@ -352,7 +354,7 @@ namespace Emby.Dlna.Didl
 
             var mediaProfile = _profile.GetVideoMediaProfile(streamInfo.Container,
                 streamInfo.TargetAudioCodec,
-                streamInfo.VideoCodec,
+                streamInfo.TargetVideoCodec,
                 streamInfo.TargetAudioBitrate,
                 targetWidth,
                 targetHeight,
@@ -363,6 +365,7 @@ namespace Emby.Dlna.Didl
                 streamInfo.TargetPacketLength,
                 streamInfo.TargetTimestamp,
                 streamInfo.IsTargetAnamorphic,
+                streamInfo.IsTargetInterlaced,
                 streamInfo.TargetRefFrames,
                 streamInfo.TargetVideoStreamCount,
                 streamInfo.TargetAudioStreamCount,
@@ -395,6 +398,78 @@ namespace Emby.Dlna.Didl
                     return _localization.GetLocalizedString("HeaderCastCrew");
                 }
                 return _localization.GetLocalizedString("HeaderPeople");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Latest)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicLatest");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Playlists)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicPlaylists");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.AlbumArtists)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicAlbumArtists");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Albums)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicAlbums");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Artists)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicArtists");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Songs)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicSongs");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Genres)
+            {
+                return _localization.GetLocalizedString("ViewTypeTvGenres");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.FavoriteAlbums)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicFavoriteAlbums");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.FavoriteArtists)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicFavoriteArtists");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.FavoriteSongs)
+            {
+                return _localization.GetLocalizedString("ViewTypeMusicFavoriteSongs");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.ContinueWatching)
+            {
+                return _localization.GetLocalizedString("ViewTypeMovieResume");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Movies)
+            {
+                return _localization.GetLocalizedString("ViewTypeMovieMovies");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Collections)
+            {
+                return _localization.GetLocalizedString("ViewTypeMovieCollections");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Favorites)
+            {
+                return _localization.GetLocalizedString("ViewTypeMovieFavorites");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.NextUp)
+            {
+                return _localization.GetLocalizedString("ViewTypeTvNextUp");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.FavoriteSeries)
+            {
+                return _localization.GetLocalizedString("ViewTypeTvFavoriteSeries");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.FavoriteEpisodes)
+            {
+                return _localization.GetLocalizedString("ViewTypeTvFavoriteEpisodes");
+            }
+            if (itemStubType.HasValue && itemStubType.Value == StubType.Series)
+            {
+                return _localization.GetLocalizedString("ViewTypeTvShowSeries");
             }
 
             var episode = item as Episode;
@@ -433,7 +508,7 @@ namespace Emby.Dlna.Didl
 
             if (streamInfo == null)
             {
-                var sources = _mediaSourceManager.GetStaticMediaSources(audio, true, _user).ToList();
+                var sources = _mediaSourceManager.GetStaticMediaSources(audio, true, _user);
 
                 streamInfo = new StreamBuilder(_mediaEncoder, GetStreamBuilderLogger(options)).BuildAudioItem(new AudioOptions
                 {
@@ -469,6 +544,7 @@ namespace Emby.Dlna.Didl
             var targetAudioBitrate = streamInfo.TargetAudioBitrate;
             var targetSampleRate = streamInfo.TargetAudioSampleRate;
             var targetChannels = streamInfo.TargetAudioChannels;
+            var targetAudioBitDepth = streamInfo.TargetAudioBitDepth;
 
             if (targetChannels.HasValue)
             {
@@ -488,7 +564,9 @@ namespace Emby.Dlna.Didl
             var mediaProfile = _profile.GetAudioMediaProfile(streamInfo.Container,
                 streamInfo.TargetAudioCodec,
                 targetChannels,
-                targetAudioBitrate);
+                targetAudioBitrate,
+                targetSampleRate,
+                targetAudioBitDepth);
 
             var filename = url.Substring(0, url.IndexOf('?'));
 
@@ -501,6 +579,7 @@ namespace Emby.Dlna.Didl
                 targetAudioBitrate,
                 targetSampleRate,
                 targetChannels,
+                targetAudioBitDepth,
                 streamInfo.IsDirectStream,
                 streamInfo.RunTimeTicks,
                 streamInfo.TranscodeSeekInfo);
@@ -645,11 +724,6 @@ namespace Emby.Dlna.Didl
             if (filter.Contains("dc:description"))
             {
                 var desc = item.Overview;
-
-                if (!string.IsNullOrEmpty(item.ShortOverview))
-                {
-                    desc = item.ShortOverview;
-                }
 
                 if (!string.IsNullOrWhiteSpace(desc))
                 {
@@ -924,7 +998,7 @@ namespace Emby.Dlna.Didl
 
             if (item is Video)
             {
-                var userData = _userDataManager.GetUserDataDto(item, _user).Result;
+                var userData = _userDataManager.GetUserDataDto(item, _user);
 
                 playbackPercentage = Convert.ToInt32(userData.PlayedPercentage ?? 0);
                 if (playbackPercentage >= 100 || userData.Played)
@@ -934,7 +1008,7 @@ namespace Emby.Dlna.Didl
             }
             else if (item is Series || item is Season || item is BoxSet)
             {
-                var userData = _userDataManager.GetUserDataDto(item, _user).Result;
+                var userData = _userDataManager.GetUserDataDto(item, _user);
 
                 if (userData.Played)
                 {

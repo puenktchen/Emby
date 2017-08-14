@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using MediaBrowser.Model.Serialization;
 using System.Threading.Tasks;
 using System.Linq;
+using MediaBrowser.Controller.Dto;
 
 namespace MediaBrowser.Controller.Entities
 {
@@ -19,11 +20,6 @@ namespace MediaBrowser.Controller.Entities
 
         public static ITVSeriesManager TVSeriesManager;
         public static IPlaylistManager PlaylistManager;
-
-        public bool ContainsDynamicCategories(User user)
-        {
-            return true;
-        }
 
         public override IEnumerable<Guid> GetIdsForAncestorQuery()
         {
@@ -45,6 +41,15 @@ namespace MediaBrowser.Controller.Entities
         }
 
         [IgnoreDataMember]
+        public override bool SupportsInheritedParentImages
+        {
+            get
+            {
+                return false;
+            }
+        }
+
+        [IgnoreDataMember]
         public override bool SupportsPlayedStatus
         {
             get
@@ -58,7 +63,7 @@ namespace MediaBrowser.Controller.Entities
             return GetChildren(user, true).Count();
         }
 
-        protected override Task<QueryResult<BaseItem>> GetItemsInternal(InternalItemsQuery query)
+        protected override QueryResult<BaseItem> GetItemsInternal(InternalItemsQuery query)
         {
             var parent = this as Folder;
 
@@ -72,19 +77,20 @@ namespace MediaBrowser.Controller.Entities
             }
 
             return new UserViewBuilder(UserViewManager, LiveTvManager, ChannelManager, LibraryManager, Logger, UserDataManager, TVSeriesManager, ConfigurationManager, PlaylistManager)
-                .GetUserItems(parent, this, ViewType, query);
+                .GetUserItems(parent, this, ViewType, query).Result;
         }
 
         public override IEnumerable<BaseItem> GetChildren(User user, bool includeLinkedChildren)
         {
-            var result = GetItems(new InternalItemsQuery
+            var result = GetItemList(new InternalItemsQuery
             {
                 User = user,
-                EnableTotalRecordCount = false
+                EnableTotalRecordCount = false,
+                DtoOptions = new DtoOptions(true)
 
-            }).Result;
+            });
 
-            return result.Items;
+            return result;
         }
 
         public override bool CanDelete()
@@ -99,17 +105,19 @@ namespace MediaBrowser.Controller.Entities
 
         public override IEnumerable<BaseItem> GetRecursiveChildren(User user, InternalItemsQuery query)
         {
-            var result = GetItems(new InternalItemsQuery
+            var result = GetItemList(new InternalItemsQuery
             {
                 User = user,
                 Recursive = true,
                 EnableTotalRecordCount = false,
 
-                ForceDirect = true
+                ForceDirect = true,
 
-            }).Result;
+                DtoOptions = query.DtoOptions
 
-            return result.Items.Where(i => UserViewBuilder.FilterItem(i, query));
+            });
+
+            return result.Where(i => UserViewBuilder.FilterItem(i, query));
         }
 
         protected override IEnumerable<BaseItem> GetEligibleChildrenForRecursiveChildren(User user)
@@ -153,17 +161,6 @@ namespace MediaBrowser.Controller.Entities
                 CollectionType.Movies, 
                 CollectionType.TvShows,
                 string.Empty
-            };
-
-            return types.Contains(viewType ?? string.Empty, StringComparer.OrdinalIgnoreCase);
-        }
-
-        public static bool IsEligibleForEnhancedView(string viewType)
-        {
-            var types = new[] 
-            { 
-                CollectionType.Movies, 
-                CollectionType.TvShows 
             };
 
             return types.Contains(viewType ?? string.Empty, StringComparer.OrdinalIgnoreCase);

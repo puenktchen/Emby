@@ -9,7 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 
@@ -17,9 +17,9 @@ namespace MediaBrowser.Providers.TV
 {
     public class SeasonMetadataService : MetadataService<Season, SeasonInfo>
     {
-        protected override async Task<ItemUpdateType> BeforeSave(Season item, bool isFullRefresh, ItemUpdateType currentUpdateType)
+        protected override ItemUpdateType BeforeSave(Season item, bool isFullRefresh, ItemUpdateType currentUpdateType)
         {
-            var updateType = await base.BeforeSave(item, isFullRefresh, currentUpdateType).ConfigureAwait(false);
+            var updateType = base.BeforeSave(item, isFullRefresh, currentUpdateType);
 
             if (item.IndexNumber.HasValue && item.IndexNumber.Value == 0)
             {
@@ -44,13 +44,6 @@ namespace MediaBrowser.Providers.TV
                 updateType |= ItemUpdateType.MetadataImport;
             }
 
-            var seriesSortName = item.FindSeriesSortName();
-            if (!string.Equals(item.SeriesSortName, seriesSortName, StringComparison.Ordinal))
-            {
-                item.SeriesSortName = seriesSortName;
-                updateType |= ItemUpdateType.MetadataImport;
-            }
-
             var seriesPresentationUniqueKey = item.FindSeriesPresentationUniqueKey();
             if (!string.Equals(item.SeriesPresentationUniqueKey, seriesPresentationUniqueKey, StringComparison.Ordinal))
             {
@@ -68,7 +61,7 @@ namespace MediaBrowser.Providers.TV
             return updateType;
         }
 
-        protected override void MergeData(MetadataResult<Season> source, MetadataResult<Season> target, List<MetadataFields> lockedFields, bool replaceData, bool mergeMetadataSettings)
+        protected override void MergeData(MetadataResult<Season> source, MetadataResult<Season> target, MetadataFields[] lockedFields, bool replaceData, bool mergeMetadataSettings)
         {
             ProviderUtils.MergeBaseItemData(source, target, lockedFields, replaceData, mergeMetadataSettings);
         }

@@ -9,13 +9,10 @@ using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.MediaInfo;
 using MediaBrowser.Model.Serialization;
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
-using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Threading;
@@ -52,10 +49,9 @@ namespace Emby.Server.Implementations.Library
             _providers = providers.ToArray();
         }
 
-        public IEnumerable<MediaStream> GetMediaStreams(MediaStreamQuery query)
+        public List<MediaStream> GetMediaStreams(MediaStreamQuery query)
         {
-            var list = _itemRepo.GetMediaStreams(query)
-                .ToList();
+            var list = _itemRepo.GetMediaStreams(query);
 
             foreach (var stream in list)
             {
@@ -80,7 +76,7 @@ namespace Emby.Server.Implementations.Library
             return false;
         }
 
-        public IEnumerable<MediaStream> GetMediaStreams(string mediaSourceId)
+        public List<MediaStream> GetMediaStreams(string mediaSourceId)
         {
             var list = GetMediaStreams(new MediaStreamQuery
             {
@@ -90,7 +86,7 @@ namespace Emby.Server.Implementations.Library
             return GetMediaStreamsForItem(list);
         }
 
-        public IEnumerable<MediaStream> GetMediaStreams(Guid itemId)
+        public List<MediaStream> GetMediaStreams(Guid itemId)
         {
             var list = GetMediaStreams(new MediaStreamQuery
             {
@@ -100,7 +96,7 @@ namespace Emby.Server.Implementations.Library
             return GetMediaStreamsForItem(list);
         }
 
-        private IEnumerable<MediaStream> GetMediaStreamsForItem(IEnumerable<MediaStream> streams)
+        private List<MediaStream> GetMediaStreamsForItem(IEnumerable<MediaStream> streams)
         {
             var list = streams.ToList();
 
@@ -256,7 +252,7 @@ namespace Emby.Server.Implementations.Library
             return sources.FirstOrDefault(i => string.Equals(i.Id, mediaSourceId, StringComparison.OrdinalIgnoreCase));
         }
 
-        public IEnumerable<MediaSourceInfo> GetStaticMediaSources(IHasMediaSources item, bool enablePathSubstitution, User user = null)
+        public List<MediaSourceInfo> GetStaticMediaSources(IHasMediaSources item, bool enablePathSubstitution, User user = null)
         {
             if (item == null)
             {
@@ -268,7 +264,7 @@ namespace Emby.Server.Implementations.Library
                 return item.GetMediaSources(enablePathSubstitution);
             }
 
-            var sources = item.GetMediaSources(enablePathSubstitution).ToList();
+            var sources = item.GetMediaSources(enablePathSubstitution);
 
             if (user != null)
             {
@@ -365,7 +361,7 @@ namespace Emby.Server.Implementations.Library
         private readonly Dictionary<string, LiveStreamInfo> _openStreams = new Dictionary<string, LiveStreamInfo>(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _liveStreamSemaphore = new SemaphoreSlim(1, 1);
 
-        public async Task<LiveStreamResponse> OpenLiveStream(LiveStreamRequest request, bool enableAutoClose, CancellationToken cancellationToken)
+        public async Task<LiveStreamResponse> OpenLiveStream(LiveStreamRequest request, CancellationToken cancellationToken)
         {
             await _liveStreamSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
 
@@ -374,7 +370,7 @@ namespace Emby.Server.Implementations.Library
                 var tuple = GetProvider(request.OpenToken);
                 var provider = tuple.Item1;
 
-                var mediaSourceTuple = await provider.OpenMediaSource(tuple.Item2, cancellationToken).ConfigureAwait(false);
+                var mediaSourceTuple = await provider.OpenMediaSource(tuple.Item2, request.EnableMediaProbe, cancellationToken).ConfigureAwait(false);
 
                 var mediaSource = mediaSourceTuple.Item1;
 
@@ -387,19 +383,12 @@ namespace Emby.Server.Implementations.Library
 
                 var info = new LiveStreamInfo
                 {
-                    Date = DateTime.UtcNow,
-                    EnableCloseTimer = enableAutoClose,
                     Id = mediaSource.LiveStreamId,
                     MediaSource = mediaSource,
                     DirectStreamProvider = mediaSourceTuple.Item2
                 };
 
                 _openStreams[mediaSource.LiveStreamId] = info;
-
-                if (enableAutoClose)
-                {
-                    StartCloseTimer();
-                }
 
                 var json = _jsonSerializer.SerializeToString(mediaSource);
                 _logger.Debug("Live stream opened: " + json);
@@ -460,28 +449,6 @@ namespace Emby.Server.Implementations.Library
             return result.Item1;
         }
 
-        public async Task PingLiveStream(string id, CancellationToken cancellationToken)
-        {
-            await _liveStreamSemaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
-
-            try
-            {
-                LiveStreamInfo info;
-                if (_openStreams.TryGetValue(id, out info))
-                {
-                    info.Date = DateTime.UtcNow;
-                }
-                else
-                {
-                    _logger.Error("Failed to ping live stream {0}", id);
-                }
-            }
-            finally
-            {
-                _liveStreamSemaphore.Release();
-            }
-        }
-
         private async Task CloseLiveStreamWithProvider(IMediaSourceProvider provider, string streamId)
         {
             _logger.Info("Closing live stream {0} with provider {1}", streamId, provider.GetType().Name);
@@ -523,11 +490,6 @@ namespace Emby.Server.Implementations.Library
 
                         await CloseLiveStreamWithProvider(tuple.Item1, tuple.Item2).ConfigureAwait(false);
                     }
-
-                    if (_openStreams.Count == 0)
-                    {
-                        StopCloseTimer();
-                    }
                 }
             }
             finally
@@ -556,66 +518,11 @@ namespace Emby.Server.Implementations.Library
             return new Tuple<IMediaSourceProvider, string>(provider, keyId);
         }
 
-        private ITimer _closeTimer;
-        private readonly TimeSpan _openStreamMaxAge = TimeSpan.FromSeconds(180);
-
-        private void StartCloseTimer()
-        {
-            StopCloseTimer();
-
-            _closeTimer = _timerFactory.Create(CloseTimerCallback, null, _openStreamMaxAge, _openStreamMaxAge);
-        }
-
-        private void StopCloseTimer()
-        {
-            var timer = _closeTimer;
-
-            if (timer != null)
-            {
-                _closeTimer = null;
-                timer.Dispose();
-            }
-        }
-
-        private async void CloseTimerCallback(object state)
-        {
-            List<LiveStreamInfo> infos;
-            await _liveStreamSemaphore.WaitAsync().ConfigureAwait(false);
-
-            try
-            {
-               infos = _openStreams
-                    .Values
-                    .Where(i => i.EnableCloseTimer && DateTime.UtcNow - i.Date > _openStreamMaxAge)
-                    .ToList();
-            }
-            finally
-            {
-                _liveStreamSemaphore.Release();
-            }
-
-            foreach (var info in infos)
-            {
-                if (!info.Closed)
-                {
-                    try
-                    {
-                        await CloseLiveStream(info.Id).ConfigureAwait(false);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.ErrorException("Error closing media source", ex);
-                    }
-                }
-            }
-        }
-
         /// <summary>
         /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
         /// </summary>
         public void Dispose()
         {
-            StopCloseTimer();
             Dispose(true);
         }
 
@@ -642,8 +549,6 @@ namespace Emby.Server.Implementations.Library
 
         private class LiveStreamInfo
         {
-            public DateTime Date;
-            public bool EnableCloseTimer;
             public string Id;
             public bool Closed;
             public MediaSourceInfo MediaSource;

@@ -9,7 +9,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Net;
@@ -118,13 +118,11 @@ namespace MediaBrowser.Api.System
 
         public object Get(GetServerLogs request)
         {
-            List<FileSystemMetadata> files;
+            IEnumerable<FileSystemMetadata> files;
 
             try
             {
-                files = _fileSystem.GetFiles(_appPaths.LogDirectoryPath)
-                    .Where(i => string.Equals(i.Extension, ".txt", StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                files = _fileSystem.GetFiles(_appPaths.LogDirectoryPath, new[] { ".txt" }, true, false);
             }
             catch (IOException)
             {

@@ -21,6 +21,9 @@
         NumVideoStreams = 17,
         IsSecondaryAudio = 18,
         VideoCodecTag = 19,
-        IsAvc = 20
+        IsAvc = 20,
+        IsInterlaced = 21,
+        AudioSampleRate = 22,
+        AudioBitDepth = 23
     }
 }

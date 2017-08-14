@@ -10,6 +10,7 @@ using MediaBrowser.Model.Activity;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Querying;
 using SQLitePCL.pretty;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.Activity
 {
@@ -60,7 +61,7 @@ namespace Emby.Server.Implementations.Activity
                     {
                         using (var statement = db.PrepareStatement("replace into ActivityLogEntries (Id, Name, Overview, ShortOverview, Type, ItemId, UserId, DateCreated, LogSeverity) values (@Id, @Name, @Overview, @ShortOverview, @Type, @ItemId, @UserId, @DateCreated, @LogSeverity)"))
                         {
-                            statement.TryBind("@Id", entry.Id.ToGuidParamValue());
+                            statement.TryBind("@Id", entry.Id.ToGuidBlob());
                             statement.TryBind("@Name", entry.Name);
 
                             statement.TryBind("@Overview", entry.Overview);
@@ -94,13 +95,13 @@ namespace Emby.Server.Implementations.Activity
 
                     var whereTextWithoutPaging = whereClauses.Count == 0 ?
                       string.Empty :
-                      " where " + string.Join(" AND ", whereClauses.ToArray());
+                      " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
                     if (startIndex.HasValue && startIndex.Value > 0)
                     {
                         var pagingWhereText = whereClauses.Count == 0 ?
                             string.Empty :
-                            " where " + string.Join(" AND ", whereClauses.ToArray());
+                            " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
                         whereClauses.Add(string.Format("Id NOT IN (SELECT Id FROM ActivityLogEntries {0} ORDER BY DateCreated DESC LIMIT {1})",
                             pagingWhereText,
@@ -109,7 +110,7 @@ namespace Emby.Server.Implementations.Activity
 
                     var whereText = whereClauses.Count == 0 ?
                         string.Empty :
-                        " where " + string.Join(" AND ", whereClauses.ToArray());
+                        " where " + string.Join(" AND ", whereClauses.ToArray(whereClauses.Count));
 
                     commandText += whereText;
 
@@ -154,7 +155,7 @@ namespace Emby.Server.Implementations.Activity
                             result.TotalRecordCount = statement.ExecuteQuery().SelectScalarInt().First();
                         }
 
-                        result.Items = list.ToArray();
+                        result.Items = list.ToArray(list.Count);
                         return result;
 
                     }, ReadTransactionMode);
@@ -168,7 +169,7 @@ namespace Emby.Server.Implementations.Activity
 
             var info = new ActivityLogEntry
             {
-                Id = reader[index].ReadGuid().ToString("N")
+                Id = reader[index].ReadGuidFromBlob().ToString("N")
             };
 
             index++;

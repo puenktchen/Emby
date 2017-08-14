@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Model.IO;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.Collections
 {
@@ -102,7 +103,7 @@ namespace Emby.Server.Implementations.Collections
                 }
                 else
                 {
-                    _providerManager.QueueRefresh(collection.Id, new MetadataRefreshOptions(_fileSystem));
+                    _providerManager.QueueRefresh(collection.Id, new MetadataRefreshOptions(_fileSystem), RefreshPriority.High);
                 }
 
                 EventHelper.FireEventIfNotNull(CollectionCreated, this, new CollectionCreatedEventArgs
@@ -170,6 +171,11 @@ namespace Emby.Server.Implementations.Collections
             {
                 var item = _libraryManager.GetItemById(itemId);
 
+                if (string.IsNullOrWhiteSpace(item.Path))
+                {
+                    continue;
+                }
+
                 if (item == null)
                 {
                     throw new ArgumentException("No item exists with the supplied Id");
@@ -185,13 +191,15 @@ namespace Emby.Server.Implementations.Collections
 
             if (list.Count > 0)
             {
-                collection.LinkedChildren.AddRange(list);
+                var newList = collection.LinkedChildren.ToList();
+                newList.AddRange(list);
+                collection.LinkedChildren = newList.ToArray(newList.Count);
 
                 collection.UpdateRatingToContent();
 
                 await collection.UpdateToRepository(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
 
-                _providerManager.QueueRefresh(collection.Id, refreshOptions);
+                _providerManager.QueueRefresh(collection.Id, refreshOptions, RefreshPriority.High);
 
                 if (fireEvent)
                 {
@@ -236,15 +244,15 @@ namespace Emby.Server.Implementations.Collections
                 }
             }
 
-            foreach (var child in list)
+            if (list.Count > 0)
             {
-                collection.LinkedChildren.Remove(child);
+                collection.LinkedChildren = collection.LinkedChildren.Except(list).ToArray();
             }
 
             collection.UpdateRatingToContent();
 
             await collection.UpdateToRepository(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
-            _providerManager.QueueRefresh(collection.Id, new MetadataRefreshOptions(_fileSystem));
+            _providerManager.QueueRefresh(collection.Id, new MetadataRefreshOptions(_fileSystem), RefreshPriority.High);
 
             EventHelper.FireEventIfNotNull(ItemsRemovedFromCollection, this, new CollectionModifiedEventArgs
             {

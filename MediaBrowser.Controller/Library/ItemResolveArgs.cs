@@ -4,7 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.Configuration;
@@ -114,7 +114,7 @@ namespace MediaBrowser.Controller.Library
                     return false;
                 }
 
-                var parentDir = System.IO.Path.GetDirectoryName(Path) ?? string.Empty;
+                var parentDir = BaseItem.FileSystem.GetDirectoryName(Path) ?? string.Empty;
 
                 return parentDir.Length > _appPaths.RootFolderPath.Length
                        && parentDir.StartsWith(_appPaths.RootFolderPath, StringComparison.OrdinalIgnoreCase);
@@ -130,7 +130,7 @@ namespace MediaBrowser.Controller.Library
         {
             get
             {
-                return IsDirectory && string.Equals(Path, _appPaths.RootFolderPath, StringComparison.OrdinalIgnoreCase);
+                return IsDirectory && BaseItem.FileSystem.AreEqual(Path, _appPaths.RootFolderPath);
             }
         }
 
@@ -238,21 +238,6 @@ namespace MediaBrowser.Controller.Library
         }
 
         /// <summary>
-        /// Determines whether [contains meta file by name] [the specified name].
-        /// </summary>
-        /// <param name="name">The name.</param>
-        /// <returns><c>true</c> if [contains meta file by name] [the specified name]; otherwise, <c>false</c>.</returns>
-        public bool ContainsMetaFileByName(string name)
-        {
-            if (string.IsNullOrEmpty(name))
-            {
-                throw new ArgumentNullException();
-            }
-
-            return GetFileSystemEntryByName(name) != null;
-        }
-
-        /// <summary>
         /// Determines whether [contains file system entry by name] [the specified name].
         /// </summary>
         /// <param name="name">The name.</param>
@@ -300,7 +285,7 @@ namespace MediaBrowser.Controller.Library
             if (args != null)
             {
                 if (args.Path == null && Path == null) return true;
-                return args.Path != null && args.Path.Equals(Path, StringComparison.OrdinalIgnoreCase);
+                return args.Path != null && BaseItem.FileSystem.AreEqual(args.Path, Path);
             }
             return false;
         }

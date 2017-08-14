@@ -8,6 +8,7 @@ using MediaBrowser.Common.Configuration;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Social;
 using SQLitePCL.pretty;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.Social
 {
@@ -61,7 +62,7 @@ namespace Emby.Server.Implementations.Social
                         var commandText = "replace into Shares (Id, ItemId, UserId, ExpirationDate) values (?, ?, ?, ?)";
 
                         db.Execute(commandText,
-                            info.Id.ToGuidParamValue(),
+                            info.Id.ToGuidBlob(),
                             info.ItemId,
                             info.UserId,
                             info.ExpirationDate.ToDateTimeParamValue());
@@ -84,9 +85,9 @@ namespace Emby.Server.Implementations.Social
                     var commandText = "select Id, ItemId, UserId, ExpirationDate from Shares where id = ?";
 
                     var paramList = new List<object>();
-                    paramList.Add(id.ToGuidParamValue());
+                    paramList.Add(id.ToGuidBlob());
 
-                    foreach (var row in connection.Query(commandText, paramList.ToArray()))
+                    foreach (var row in connection.Query(commandText, paramList.ToArray(paramList.Count)))
                     {
                         return GetSocialShareInfo(row);
                     }
@@ -100,7 +101,7 @@ namespace Emby.Server.Implementations.Social
         {
             var info = new SocialShareInfo();
 
-            info.Id = reader[0].ReadGuid().ToString("N");
+            info.Id = reader[0].ReadGuidFromBlob().ToString("N");
             info.ItemId = reader[1].ToString();
             info.UserId = reader[2].ToString();
             info.ExpirationDate = reader[3].ReadDateTime();

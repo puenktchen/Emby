@@ -35,9 +35,7 @@ namespace MediaBrowser.LocalMetadata.Savers
                     "AspectRatio",
                     "AudioDbAlbumId",
                     "AudioDbArtistId",
-                    "AwardSummary",
                     "BirthDate",
-                    "Budget",
                     
                     // Deprecated. No longer saving in this field.
                     "certification",
@@ -47,7 +45,6 @@ namespace MediaBrowser.LocalMetadata.Savers
                     "Countries",
                     "CustomRating",
                     "CriticRating",
-                    "CriticRatingSummary",
                     "DeathDate",
                     "DisplayOrder",
                     "EndDate",
@@ -69,12 +66,9 @@ namespace MediaBrowser.LocalMetadata.Savers
                     "LockData",
                     "LockedFields",
                     "Format3D",
-                    "Metascore",
                     
                     // Deprecated. No longer saving in this field.
                     "MPAARating",
-
-                    "MPAADescription",
 
                     "MusicBrainzArtistId",
                     "MusicBrainzAlbumArtistId",
@@ -85,13 +79,10 @@ namespace MediaBrowser.LocalMetadata.Savers
                     "MusicbrainzId",
 
                     "Overview",
-                    "ShortOverview",
                     "Persons",
-                    "PlotKeywords",
                     "PremiereDate",
                     "ProductionYear",
                     "Rating",
-                    "Revenue",
                     "RottenTomatoesId",
                     "RunningTime",
                     
@@ -115,9 +106,7 @@ namespace MediaBrowser.LocalMetadata.Savers
                     "Trailers",
                     "TVcomId",
                     "TvDbId",
-                    "Type",
                     "TVRageId",
-                    "VoteCount",
                     "Website",
                     "Zap2ItId",
                     "CollectionItems",
@@ -214,7 +203,7 @@ namespace MediaBrowser.LocalMetadata.Savers
 
         private void SaveToFile(Stream stream, string path)
         {
-            FileSystem.CreateDirectory(Path.GetDirectoryName(path));
+            FileSystem.CreateDirectory(FileSystem.GetDirectoryName(path));
 
             var file = FileSystem.GetFileInfo(path);
 
@@ -225,13 +214,9 @@ namespace MediaBrowser.LocalMetadata.Savers
             {
                 if (file.IsHidden)
                 {
-                    FileSystem.SetHidden(path, false);
                     wasHidden = true;
                 }
-                if (file.IsReadOnly)
-                {
-                    FileSystem.SetReadOnly(path, false);
-                }
+                FileSystem.SetAttributes(path, false, false);
             }
 
             using (var filestream = FileSystem.GetFileStream(path, FileOpenMode.Create, FileAccessMode.Write, FileShareMode.Read))
@@ -313,33 +298,18 @@ namespace MediaBrowser.LocalMetadata.Savers
                 writer.WriteElementString("ContentRating", item.OfficialRating);
             }
 
-            if (!string.IsNullOrEmpty(item.OfficialRatingDescription))
-            {
-                writer.WriteElementString("MPAADescription", item.OfficialRatingDescription);
-            }
-
             writer.WriteElementString("Added", item.DateCreated.ToLocalTime().ToString("G"));
 
             writer.WriteElementString("LockData", item.IsLocked.ToString().ToLower());
 
-            if (item.LockedFields.Count > 0)
+            if (item.LockedFields.Length > 0)
             {
-                writer.WriteElementString("LockedFields", string.Join("|", item.LockedFields.Select(i => i.ToString()).ToArray()));
-            }
-
-            if (!string.IsNullOrEmpty(item.DisplayMediaType))
-            {
-                writer.WriteElementString("Type", item.DisplayMediaType);
+                writer.WriteElementString("LockedFields", string.Join("|", item.LockedFields));
             }
 
             if (item.CriticRating.HasValue)
             {
                 writer.WriteElementString("CriticRating", item.CriticRating.Value.ToString(UsCulture));
-            }
-
-            if (!string.IsNullOrEmpty(item.CriticRatingSummary))
-            {
-                writer.WriteElementString("CriticRatingSummary", item.CriticRatingSummary);
             }
 
             if (!string.IsNullOrEmpty(item.Overview))
@@ -351,10 +321,6 @@ namespace MediaBrowser.LocalMetadata.Savers
             {
                 writer.WriteElementString("OriginalTitle", item.OriginalTitle);
             }
-            if (!string.IsNullOrEmpty(item.ShortOverview))
-            {
-                writer.WriteElementString("ShortOverview", item.ShortOverview);
-            }
             if (!string.IsNullOrEmpty(item.CustomRating))
             {
                 writer.WriteElementString("CustomRating", item.CustomRating);
@@ -365,9 +331,10 @@ namespace MediaBrowser.LocalMetadata.Savers
                 writer.WriteElementString("LocalTitle", item.Name);
             }
 
-            if (!string.IsNullOrEmpty(item.ForcedSortName))
+            var forcedSortName = item.ForcedSortName;
+            if (!string.IsNullOrEmpty(forcedSortName))
             {
-                writer.WriteElementString("SortTitle", item.ForcedSortName);
+                writer.WriteElementString("SortTitle", forcedSortName);
             }
 
             if (item.PremiereDate.HasValue)
@@ -397,7 +364,7 @@ namespace MediaBrowser.LocalMetadata.Savers
             var hasTrailers = item as IHasTrailers;
             if (hasTrailers != null)
             {
-                if (hasTrailers.RemoteTrailers.Count > 0)
+                if (hasTrailers.RemoteTrailers.Length > 0)
                 {
                     writer.WriteStartElement("Trailers");
 
@@ -410,7 +377,7 @@ namespace MediaBrowser.LocalMetadata.Savers
                 }
             }
 
-            if (item.ProductionLocations.Count > 0)
+            if (item.ProductionLocations.Length > 0)
             {
                 writer.WriteStartElement("Countries");
 
@@ -428,39 +395,9 @@ namespace MediaBrowser.LocalMetadata.Savers
                 writer.WriteElementString("DisplayOrder", hasDisplayOrder.DisplayOrder);
             }
 
-            var hasMetascore = item as IHasMetascore;
-            if (hasMetascore != null && hasMetascore.Metascore.HasValue)
-            {
-                writer.WriteElementString("Metascore", hasMetascore.Metascore.Value.ToString(UsCulture));
-            }
-
-            var hasAwards = item as IHasAwards;
-            if (hasAwards != null && !string.IsNullOrEmpty(hasAwards.AwardSummary))
-            {
-                writer.WriteElementString("AwardSummary", hasAwards.AwardSummary);
-            }
-
-            var hasBudget = item as IHasBudget;
-            if (hasBudget != null)
-            {
-                if (hasBudget.Budget.HasValue)
-                {
-                    writer.WriteElementString("Budget", hasBudget.Budget.Value.ToString(UsCulture));
-                }
-
-                if (hasBudget.Revenue.HasValue)
-                {
-                    writer.WriteElementString("Revenue", hasBudget.Revenue.Value.ToString(UsCulture));
-                }
-            }
-
             if (item.CommunityRating.HasValue)
             {
                 writer.WriteElementString("Rating", item.CommunityRating.Value.ToString(UsCulture));
-            }
-            if (item.VoteCount.HasValue)
-            {
-                writer.WriteElementString("VoteCount", item.VoteCount.Value.ToString(UsCulture));
             }
 
             if (item.ProductionYear.HasValue && !(item is Person))
@@ -532,7 +469,7 @@ namespace MediaBrowser.LocalMetadata.Savers
                 writer.WriteEndElement();
             }
 
-            if (item.Studios.Count > 0)
+            if (item.Studios.Length > 0)
             {
                 writer.WriteStartElement("Studios");
 
@@ -544,25 +481,13 @@ namespace MediaBrowser.LocalMetadata.Savers
                 writer.WriteEndElement();
             }
 
-            if (item.Tags.Count > 0)
+            if (item.Tags.Length > 0)
             {
                 writer.WriteStartElement("Tags");
 
                 foreach (var tag in item.Tags)
                 {
                     writer.WriteElementString("Tag", tag);
-                }
-
-                writer.WriteEndElement();
-            }
-
-            if (item.Keywords.Count > 0)
-            {
-                writer.WriteStartElement("PlotKeywords");
-
-                foreach (var tag in item.Keywords)
-                {
-                    writer.WriteElementString("PlotKeyword", tag);
                 }
 
                 writer.WriteEndElement();

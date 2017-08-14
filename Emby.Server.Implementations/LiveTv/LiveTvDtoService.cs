@@ -149,7 +149,11 @@ namespace Emby.Server.Implementations.LiveTv
                 IncludeItemTypes = new string[] { typeof(Series).Name },
                 Name = seriesName,
                 Limit = 1,
-                ImageTypes = new ImageType[] { ImageType.Thumb }
+                ImageTypes = new ImageType[] { ImageType.Thumb },
+                DtoOptions = new DtoOptions
+                {
+                    Fields = new List<MediaBrowser.Model.Querying.ItemFields>()
+                }
 
             }).FirstOrDefault();
 
@@ -172,7 +176,7 @@ namespace Emby.Server.Implementations.LiveTv
                 {
                     try
                     {
-                        dto.ParentBackdropImageTags = new List<string>
+                        dto.ParentBackdropImageTags = new string[]
                             {
                                 _imageProcessor.GetImageCacheTag(librarySeries, image)
                             };
@@ -191,7 +195,11 @@ namespace Emby.Server.Implementations.LiveTv
                     IncludeItemTypes = new string[] { typeof(LiveTvProgram).Name },
                     ExternalSeriesId = programSeriesId,
                     Limit = 1,
-                    ImageTypes = new ImageType[] { ImageType.Primary }
+                    ImageTypes = new ImageType[] { ImageType.Primary },
+                    DtoOptions = new DtoOptions
+                    {
+                        Fields = new List<MediaBrowser.Model.Querying.ItemFields>()
+                    }
 
                 }).FirstOrDefault();
 
@@ -210,14 +218,14 @@ namespace Emby.Server.Implementations.LiveTv
                         }
                     }
 
-                    if (dto.ParentBackdropImageTags == null || dto.ParentBackdropImageTags.Count == 0)
+                    if (dto.ParentBackdropImageTags == null || dto.ParentBackdropImageTags.Length == 0)
                     {
                         image = program.GetImageInfo(ImageType.Backdrop, 0);
                         if (image != null)
                         {
                             try
                             {
-                                dto.ParentBackdropImageTags = new List<string>
+                                dto.ParentBackdropImageTags = new string[]
                             {
                                 _imageProcessor.GetImageCacheTag(program, image)
                             };
@@ -239,7 +247,11 @@ namespace Emby.Server.Implementations.LiveTv
                 IncludeItemTypes = new string[] { typeof(Series).Name },
                 Name = seriesName,
                 Limit = 1,
-                ImageTypes = new ImageType[] { ImageType.Thumb }
+                ImageTypes = new ImageType[] { ImageType.Thumb },
+                DtoOptions = new DtoOptions
+                {
+                    Fields = new List<MediaBrowser.Model.Querying.ItemFields>()
+                }
 
             }).FirstOrDefault();
 
@@ -278,10 +290,25 @@ namespace Emby.Server.Implementations.LiveTv
             {
                 var program = _libraryManager.GetItemList(new InternalItemsQuery
                 {
+                    IncludeItemTypes = new string[] { typeof(Series).Name },
+                    Name = seriesName,
+                    Limit = 1,
+                    ImageTypes = new ImageType[] { ImageType.Primary },
+                    DtoOptions = new DtoOptions
+                    {
+                        Fields = new List<MediaBrowser.Model.Querying.ItemFields>()
+                    }
+
+                }).FirstOrDefault() ?? _libraryManager.GetItemList(new InternalItemsQuery
+                {
                     IncludeItemTypes = new string[] { typeof(LiveTvProgram).Name },
                     ExternalSeriesId = programSeriesId,
                     Limit = 1,
-                    ImageTypes = new ImageType[] { ImageType.Primary }
+                    ImageTypes = new ImageType[] { ImageType.Primary },
+                    DtoOptions = new DtoOptions
+                    {
+                        Fields = new List<MediaBrowser.Model.Querying.ItemFields>()
+                    }
 
                 }).FirstOrDefault();
 
@@ -379,7 +406,7 @@ namespace Emby.Server.Implementations.LiveTv
             return dto;
         }
 
-        internal string GetImageTag(IHasImages info)
+        internal string GetImageTag(IHasMetadata info)
         {
             try
             {

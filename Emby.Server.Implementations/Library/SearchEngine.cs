@@ -8,7 +8,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Extensions;
+using MediaBrowser.Model.Extensions;
 
 namespace Emby.Server.Implementations.Library
 {
@@ -98,7 +100,7 @@ namespace Emby.Server.Implementations.Library
 
             var hints = new List<Tuple<BaseItem, string, int>>();
 
-            var excludeItemTypes = new List<string>();
+            var excludeItemTypes = query.ExcludeItemTypes.ToList();
             var includeItemTypes = (query.IncludeItemTypes ?? new string[] { }).ToList();
 
             excludeItemTypes.Add(typeof(Year).Name);
@@ -162,10 +164,30 @@ namespace Emby.Server.Implementations.Library
             var mediaItems = _libraryManager.GetItemList(new InternalItemsQuery(user)
             {
                 NameContains = searchTerm,
-                ExcludeItemTypes = excludeItemTypes.ToArray(),
-                IncludeItemTypes = includeItemTypes.ToArray(),
+                ExcludeItemTypes = excludeItemTypes.ToArray(excludeItemTypes.Count),
+                IncludeItemTypes = includeItemTypes.ToArray(includeItemTypes.Count),
                 Limit = query.Limit,
-                IncludeItemsByName = true
+                IncludeItemsByName = string.IsNullOrWhiteSpace(query.ParentId),
+                ParentId = string.IsNullOrWhiteSpace(query.ParentId) ? (Guid?)null : new Guid(query.ParentId),
+                SortBy = new[] { ItemSortBy.SortName },
+                Recursive = true,
+
+                IsKids = query.IsKids,
+                IsMovie = query.IsMovie,
+                IsNews = query.IsNews,
+                IsSeries = query.IsSeries,
+                IsSports = query.IsSports,
+                MediaTypes = query.MediaTypes,
+
+                DtoOptions = new DtoOptions
+                {
+                    Fields = new List<ItemFields>
+                    {
+                         ItemFields.AirTime,
+                         ItemFields.DateCreated,
+                         ItemFields.ChannelInfo
+                    }
+                }
             });
 
             // Add search hints based on item name
@@ -176,7 +198,7 @@ namespace Emby.Server.Implementations.Library
                 return new Tuple<BaseItem, string, int>(item, index.Item1, index.Item2);
             }));
 
-            var returnValue = hints.Where(i => i.Item3 >= 0).OrderBy(i => i.Item3).Select(i => new SearchHintInfo
+            var returnValue = hints.Where(i => i.Item3 >= 0).OrderBy(i => i.Item3).ThenBy(i => i.Item1.SortName).Select(i => new SearchHintInfo
             {
                 Item = i.Item1,
                 MatchedTerm = i.Item2

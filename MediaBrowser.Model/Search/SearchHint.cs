@@ -1,4 +1,6 @@
-﻿namespace MediaBrowser.Model.Search
+﻿using System;
+
+namespace MediaBrowser.Model.Search
 {
     /// <summary>
     /// Class SearchHintResult
@@ -89,17 +91,16 @@
         /// <value>The type of the media.</value>
         public string MediaType { get; set; }
 
-        /// <summary>
-        /// Gets or sets the display type of the media.
-        /// </summary>
-        /// <value>The display type of the media.</value>
-        public string DisplayMediaType { get; set; }
-        
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+
         /// <summary>
         /// Gets or sets the series.
         /// </summary>
         /// <value>The series.</value>
         public string Series { get; set; }
+
+        public string Status { get; set; }
 
         /// <summary>
         /// Gets or sets the album.

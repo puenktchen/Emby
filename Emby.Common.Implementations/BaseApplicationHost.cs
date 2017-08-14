@@ -31,17 +31,12 @@ using Emby.Common.Implementations.Net;
 using Emby.Common.Implementations.EnvironmentInfo;
 using Emby.Common.Implementations.Threading;
 using MediaBrowser.Common;
-using MediaBrowser.Common.IO;
 using MediaBrowser.Model.Cryptography;
 using MediaBrowser.Model.Diagnostics;
 using MediaBrowser.Model.Net;
 using MediaBrowser.Model.System;
 using MediaBrowser.Model.Tasks;
 using MediaBrowser.Model.Threading;
-
-#if NETSTANDARD1_6
-using System.Runtime.Loader;
-#endif
 
 namespace Emby.Common.Implementations
 {
@@ -147,7 +142,7 @@ namespace Emby.Common.Implementations
         /// <value>The configuration manager.</value>
         protected IConfigurationManager ConfigurationManager { get; private set; }
 
-        protected IFileSystem FileSystemManager { get; private set; }
+        public IFileSystem FileSystemManager { get; private set; }
 
         protected IIsoManager IsoManager { get; private set; }
 
@@ -174,8 +169,20 @@ namespace Emby.Common.Implementations
                 {
                     _deviceId = new DeviceId(ApplicationPaths, LogManager.GetLogger("SystemId"), FileSystemManager);
                 }
-             
+
                 return _deviceId.Value;
+            }
+        }
+
+        public PackageVersionClass SystemUpdateLevel
+        {
+            get
+            {
+
+#if BETA
+                return PackageVersionClass.Beta;
+#endif
+                return PackageVersionClass.Release;
             }
         }
 
@@ -210,7 +217,7 @@ namespace Emby.Common.Implementations
 
             // hack alert, until common can target .net core
             BaseExtensions.CryptographyProvider = CryptographyProvider;
-            
+
             XmlSerializer = new MyXmlSerializer(fileSystem, logManager.GetLogger("XmlSerializer"));
             FailedAssemblies = new List<string>();
 
@@ -301,7 +308,6 @@ namespace Emby.Common.Implementations
 
             builder.AppendLine(string.Format("Command line: {0}", string.Join(" ", Environment.GetCommandLineArgs())));
 
-#if NET46
             builder.AppendLine(string.Format("Operating system: {0}", Environment.OSVersion));
             builder.AppendLine(string.Format("64-Bit OS: {0}", Environment.Is64BitOperatingSystem));
             builder.AppendLine(string.Format("64-Bit Process: {0}", Environment.Is64BitProcess));
@@ -315,7 +321,6 @@ namespace Emby.Common.Implementations
                     builder.AppendLine("Mono: " + displayName.Invoke(null, null));
                 }
             }
-#endif    
 
             builder.AppendLine(string.Format("Processor count: {0}", Environment.ProcessorCount));
             builder.AppendLine(string.Format("Program data path: {0}", appPaths.ProgramDataPath));
@@ -331,9 +336,7 @@ namespace Emby.Common.Implementations
             try
             {
                 // Increase the max http request limit
-#if NET46
                 ServicePointManager.DefaultConnectionLimit = Math.Max(96, ServicePointManager.DefaultConnectionLimit);
-#endif    
             }
             catch (Exception ex)
             {
@@ -431,7 +434,6 @@ namespace Emby.Common.Implementations
 
                 if (assemblyPlugin != null)
                 {
-#if NET46
                     var assembly = plugin.GetType().Assembly;
                     var assemblyName = assembly.GetName();
 
@@ -442,21 +444,6 @@ namespace Emby.Common.Implementations
                     var assemblyFilePath = Path.Combine(ApplicationPaths.PluginsPath, assemblyFileName);
 
                     assemblyPlugin.SetAttributes(assemblyFilePath, assemblyFileName, assemblyName.Version, assemblyId);
-#elif NETSTANDARD1_6
-                    var typeInfo = plugin.GetType().GetTypeInfo();
-                    var assembly = typeInfo.Assembly;
-                    var assemblyName = assembly.GetName();
-
-                    var attribute = (GuidAttribute)assembly.GetCustomAttribute(typeof(GuidAttribute));
-                    var assemblyId = new Guid(attribute.Value);
-
-                    var assemblyFileName = assemblyName.Name + ".dll";
-                    var assemblyFilePath = Path.Combine(ApplicationPaths.PluginsPath, assemblyFileName);
-
-                    assemblyPlugin.SetAttributes(assemblyFilePath, assemblyFileName, assemblyName.Version, assemblyId);
-#else
-return null;
-#endif
                 }
 
                 var isFirstRun = !File.Exists(plugin.ConfigurationFilePath);
@@ -487,17 +474,7 @@ return null;
 
             AllConcreteTypes = assemblies
                 .SelectMany(GetTypes)
-                .Where(t =>
-                {
-#if NET46
-                    return t.IsClass && !t.IsAbstract && !t.IsInterface && !t.IsGenericType;
-#endif    
-#if NETSTANDARD1_6
-                    var typeInfo = t.GetTypeInfo();
-                    return typeInfo.IsClass && !typeInfo.IsAbstract && !typeInfo.IsInterface && !typeInfo.IsGenericType;
-#endif
-                    return false;
-                })
+                .Where(t => t.IsClass && !t.IsAbstract && !t.IsInterface && !t.IsGenericType)
                 .ToArray();
         }
 
@@ -527,7 +504,7 @@ return null;
 
             RegisterSingleInstance(FileSystemManager);
 
-            HttpClient = new HttpClientManager.HttpClientManager(ApplicationPaths, LogManager.GetLogger("HttpClient"), FileSystemManager, MemoryStreamFactory);
+            HttpClient = new HttpClientManager.HttpClientManager(ApplicationPaths, LogManager.GetLogger("HttpClient"), FileSystemManager, MemoryStreamFactory, GetDefaultUserAgent);
             RegisterSingleInstance(HttpClient);
 
             RegisterSingleInstance(NetworkManager);
@@ -549,6 +526,30 @@ return null;
             return Task.FromResult(true);
         }
 
+        private string GetDefaultUserAgent()
+        {
+            var name = FormatAttribute(Name);
+
+            return name + "/" + ApplicationVersion.ToString();
+        }
+
+        private string FormatAttribute(string str)
+        {
+            var arr = str.ToCharArray();
+
+            arr = Array.FindAll<char>(arr, (c => (char.IsLetterOrDigit(c)
+                                              || char.IsWhiteSpace(c))));
+
+            var result = new string(arr);
+
+            if (string.IsNullOrWhiteSpace(result))
+            {
+                result = "Emby";
+            }
+
+            return result;
+        }
+
         /// <summary>
         /// Gets a list of types within an assembly
         /// This will handle situations that would normally throw an exception - such as a type within the assembly that depends on some other non-existant reference
@@ -556,16 +557,19 @@ return null;
         /// <param name="assembly">The assembly.</param>
         /// <returns>IEnumerable{Type}.</returns>
         /// <exception cref="System.ArgumentNullException">assembly</exception>
-        protected IEnumerable<Type> GetTypes(Assembly assembly)
+        protected List<Type> GetTypes(Assembly assembly)
         {
             if (assembly == null)
             {
-                throw new ArgumentNullException("assembly");
+                return new List<Type>();
             }
 
             try
             {
-                return assembly.GetTypes();
+                // This null checking really shouldn't be needed but adding it due to some
+                // unhandled exceptions in mono 5.0 that are a little hard to hunt down
+                var types = assembly.GetTypes() ?? new Type[] { };
+                return types.Where(t => t != null).ToList();
             }
             catch (ReflectionTypeLoadException ex)
             {
@@ -573,12 +577,22 @@ return null;
                 {
                     foreach (var loaderException in ex.LoaderExceptions)
                     {
-                        Logger.Error("LoaderException: " + loaderException.Message);
+                        if (loaderException != null)
+                        {
+                            Logger.Error("LoaderException: " + loaderException.Message);
+                        }
                     }
                 }
 
                 // If it fails we can still get a list of the Types it was able to resolve
-                return ex.Types.Where(t => t != null);
+                var types = ex.Types ?? new Type[] { };
+                return types.Where(t => t != null).ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.ErrorException("Error loading types from assembly", ex);
+
+                return new List<Type>();
             }
         }
 
@@ -688,13 +702,7 @@ return null;
         {
             try
             {
-#if NET46
                 return Assembly.Load(File.ReadAllBytes(file));
-#elif NETSTANDARD1_6
-                
-                return AssemblyLoadContext.Default.LoadFromStream(new MemoryStream(File.ReadAllBytes(file)));
-#endif
-                return null;
             }
             catch (Exception ex)
             {
@@ -713,14 +721,7 @@ return null;
         {
             var currentType = typeof(T);
 
-#if NET46
             return AllConcreteTypes.Where(currentType.IsAssignableFrom);
-#elif NETSTANDARD1_6
-            var currentTypeInfo = currentType.GetTypeInfo();
-
-            return AllConcreteTypes.Where(currentTypeInfo.IsAssignableFrom);
-#endif
-            return new List<Type>();
         }
 
         /// <summary>
@@ -849,7 +850,13 @@ return null;
         /// Gets or sets a value indicating whether this instance can self update.
         /// </summary>
         /// <value><c>true</c> if this instance can self update; otherwise, <c>false</c>.</value>
-        public abstract bool CanSelfUpdate { get; }
+        public virtual bool CanSelfUpdate
+        {
+            get
+            {
+                return false;
+            }
+        }
 
         /// <summary>
         /// Checks for update.

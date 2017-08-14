@@ -16,8 +16,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
-using MediaBrowser.Common.IO;
-using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Xml;
 
@@ -50,12 +48,12 @@ namespace MediaBrowser.Providers.TV
             get { return "TheTVDB"; }
         }
 
-        public bool Supports(IHasImages item)
+        public bool Supports(IHasMetadata item)
         {
             return item is Season;
         }
 
-        public IEnumerable<ImageType> GetSupportedImages(IHasImages item)
+        public IEnumerable<ImageType> GetSupportedImages(IHasMetadata item)
         {
             return new List<ImageType>
             {
@@ -65,7 +63,7 @@ namespace MediaBrowser.Providers.TV
             };
         }
 
-        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasImages item, CancellationToken cancellationToken)
+        public async Task<IEnumerable<RemoteImageInfo>> GetImages(IHasMetadata item, CancellationToken cancellationToken)
         {
             var season = (Season)item;
             var series = season.Series;
@@ -75,7 +73,7 @@ namespace MediaBrowser.Providers.TV
                 var seriesProviderIds = series.ProviderIds;
                 var seasonNumber = season.IndexNumber.Value;
 
-                var seriesDataPath = await TvdbSeriesProvider.Current.EnsureSeriesInfo(seriesProviderIds, series.GetPreferredMetadataLanguage(), cancellationToken).ConfigureAwait(false);
+                var seriesDataPath = await TvdbSeriesProvider.Current.EnsureSeriesInfo(seriesProviderIds, series.Name, series.ProductionYear, series.GetPreferredMetadataLanguage(), cancellationToken).ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(seriesDataPath))
                 {
@@ -97,15 +95,6 @@ namespace MediaBrowser.Providers.TV
             }
 
             return new RemoteImageInfo[] { };
-        }
-
-        private int AdjustForSeriesOffset(Series series, int seasonNumber)
-        {
-            var offset = TvdbSeriesProvider.GetSeriesOffset(series.ProviderIds);
-            if (offset != null)
-                return (seasonNumber + offset.Value);
-
-            return seasonNumber;
         }
 
         internal static IEnumerable<RemoteImageInfo> GetImages(string xmlPath, string preferredLanguage, int seasonNumber, IXmlReaderSettingsFactory xmlReaderSettingsFactory, IFileSystem fileSystem, CancellationToken cancellationToken)
@@ -186,8 +175,7 @@ namespace MediaBrowser.Providers.TV
                     return 0;
                 })
                 .ThenByDescending(i => i.CommunityRating ?? 0)
-                .ThenByDescending(i => i.VoteCount ?? 0)
-                .ToList();
+                .ThenByDescending(i => i.VoteCount ?? 0);
         }
 
         private static void AddImage(XmlReader reader, List<RemoteImageInfo> images, int seasonNumber)
@@ -367,8 +355,7 @@ namespace MediaBrowser.Providers.TV
             return _httpClient.GetResponse(new HttpRequestOptions
             {
                 CancellationToken = cancellationToken,
-                Url = url,
-                ResourcePool = TvdbSeriesProvider.Current.TvDbResourcePool
+                Url = url
             });
         }
     }

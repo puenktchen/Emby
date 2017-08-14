@@ -16,16 +16,6 @@
         AlternateEpisodeNumbers,
 
         /// <summary>
-        /// The awards summary
-        /// </summary>
-        AwardSummary,
-
-        /// <summary>
-        /// The budget
-        /// </summary>
-        Budget,
-
-        /// <summary>
         /// The can delete
         /// </summary>
         CanDelete,
@@ -46,11 +36,6 @@
         Chapters,
 
         ChildCount,
-
-        /// <summary>
-        /// The critic rating summary
-        /// </summary>
-        CriticRatingSummary,
 
         /// <summary>
         /// The cumulative run time ticks
@@ -103,19 +88,9 @@
         HomePageUrl,
 
         /// <summary>
-        /// The fields that the server supports indexing on
-        /// </summary>
-        IndexOptions,
-
-        /// <summary>
         /// The item counts
         /// </summary>
         ItemCounts,
-
-        /// <summary>
-        /// The keywords
-        /// </summary>
-        Keywords,
 
         /// <summary>
         /// The media source count
@@ -126,13 +101,6 @@
         /// The media versions
         /// </summary>
         MediaSources,
-
-        /// <summary>
-        /// The metascore
-        /// </summary>
-        Metascore,
-
-        OfficialRatingDescription,
 
         OriginalTitle,
 
@@ -156,6 +124,8 @@
         /// </summary>
         People,
 
+        PlayAccess,
+
         /// <summary>
         /// The production locations
         /// </summary>
@@ -174,34 +144,14 @@
         RecursiveItemCount,
 
         /// <summary>
-        /// The revenue
-        /// </summary>
-        Revenue,
-
-        /// <summary>
-        /// The season name
-        /// </summary>
-        SeasonName,
-
-        /// <summary>
         /// The settings
         /// </summary>
         Settings,
 
         /// <summary>
-        /// The short overview
-        /// </summary>
-        ShortOverview,
-
-        /// <summary>
         /// The screenshot image tags
         /// </summary>
         ScreenshotImageTags,
-
-        /// <summary>
-        /// The series genres
-        /// </summary>
-        SeriesGenres,
 
         SeriesPrimaryImage,
 
@@ -242,11 +192,6 @@
         Tags,
 
         /// <summary>
-        /// The vote count
-        /// </summary>
-        VoteCount,
-
-        /// <summary>
         /// The trailer url of the item
         /// </summary>
         RemoteTrailers,
@@ -266,6 +211,15 @@
         /// </summary>
         ServiceName,
         ThemeSongIds,
-        ThemeVideoIds
+        ThemeVideoIds,
+        ExternalEtag,
+        PresentationUniqueKey,
+        InheritedParentalRatingValue,
+        ExternalSeriesId,
+        SeriesPresentationUniqueKey,
+        DateLastRefreshed,
+        DateLastSaved,
+        RefreshState,
+        ChannelImage
     }
 }

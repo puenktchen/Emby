@@ -59,7 +59,7 @@ namespace MediaBrowser.Model.Sync
         /// Gets or sets the status.
         /// </summary>
         /// <value>The status.</value>
-        public SyncJobStatus Status { get; set; }        
+        public SyncJobStatus Status { get; set; }
         /// <summary>
         /// Gets or sets the user identifier.
         /// </summary>

@@ -141,11 +141,6 @@ namespace MediaBrowser.Providers.MediaInfo
                 return _cachedTask;
             }
 
-            if (item.VideoType == VideoType.HdDvd)
-            {
-                return _cachedTask;
-            }
-
             if (item.IsPlaceHolder)
             {
                 return _cachedTask;
@@ -199,7 +194,6 @@ namespace MediaBrowser.Providers.MediaInfo
                 {
                     return !video.SubtitleFiles
                         .SequenceEqual(SubtitleResolver.GetSubtitleFiles(video, directoryService, _fileSystem, false)
-                        .Select(i => i.FullName)
                         .OrderBy(i => i), StringComparer.OrdinalIgnoreCase);
                 }
             }

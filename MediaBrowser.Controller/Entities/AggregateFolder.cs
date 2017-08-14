@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using MediaBrowser.Common.IO;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Serialization;
@@ -22,17 +21,6 @@ namespace MediaBrowser.Controller.Entities
         public AggregateFolder()
         {
             PhysicalLocationsList = new List<string>();
-        }
-
-        /// <summary>
-        /// We don't support manual shortcuts
-        /// </summary>
-        protected override bool SupportsShortcutChildren
-        {
-            get
-            {
-                return false;
-            }
         }
 
         [IgnoreDataMember]
@@ -80,14 +68,14 @@ namespace MediaBrowser.Controller.Entities
 
         public List<string> PhysicalLocationsList { get; set; }
 
-        protected override IEnumerable<FileSystemMetadata> GetFileSystemChildren(IDirectoryService directoryService)
+        protected override FileSystemMetadata[] GetFileSystemChildren(IDirectoryService directoryService)
         {
-            return CreateResolveArgs(directoryService, true).FileSystemChildren;
+            return CreateResolveArgs(directoryService, true).FileSystemChildren.ToArray();
         }
 
         private List<Guid> _childrenIds = null;
         private readonly object _childIdsLock = new object();
-        protected override IEnumerable<BaseItem> LoadChildren()
+        protected override List<BaseItem> LoadChildren()
         {
             lock (_childIdsLock)
             {

@@ -8,7 +8,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Common.Extensions;
-using MediaBrowser.Common.IO;
 using MediaBrowser.Common.Net;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.IO;
@@ -33,25 +32,21 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
             _appHost = appHost;
         }
 
-        public async Task<List<M3UChannel>> Parse(string url, string channelIdPrefix, string tunerHostId, bool enableStreamUrlAsIdentifier, CancellationToken cancellationToken)
+        public async Task<List<M3UChannel>> Parse(string url, string channelIdPrefix, string tunerHostId, CancellationToken cancellationToken)
         {
-            var urlHash = url.GetMD5().ToString("N");
-
             // Read the file and display it line by line.
             using (var reader = new StreamReader(await GetListingsStream(url, cancellationToken).ConfigureAwait(false)))
             {
-                return GetChannels(reader, urlHash, channelIdPrefix, tunerHostId, enableStreamUrlAsIdentifier);
+                return GetChannels(reader, channelIdPrefix, tunerHostId);
             }
         }
 
         public List<M3UChannel> ParseString(string text, string channelIdPrefix, string tunerHostId)
         {
-            var urlHash = "text".GetMD5().ToString("N");
-
             // Read the file and display it line by line.
             using (var reader = new StringReader(text))
             {
-                return GetChannels(reader, urlHash, channelIdPrefix, tunerHostId, false);
+                return GetChannels(reader, channelIdPrefix, tunerHostId);
             }
         }
 
@@ -71,11 +66,12 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
         }
 
         const string ExtInfPrefix = "#EXTINF:";
-        private List<M3UChannel> GetChannels(TextReader reader, string urlHash, string channelIdPrefix, string tunerHostId, bool enableStreamUrlAsIdentifier)
+        private List<M3UChannel> GetChannels(TextReader reader, string channelIdPrefix, string tunerHostId)
         {
             var channels = new List<M3UChannel>();
             string line;
             string extInf = "";
+
             while ((line = reader.ReadLine()) != null)
             {
                 line = line.Trim();
@@ -97,13 +93,13 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                 else if (!string.IsNullOrWhiteSpace(extInf) && !line.StartsWith("#", StringComparison.OrdinalIgnoreCase))
                 {
                     var channel = GetChannelnfo(extInf, tunerHostId, line);
-                    if (string.IsNullOrWhiteSpace(channel.Id) || enableStreamUrlAsIdentifier)
+                    if (string.IsNullOrWhiteSpace(channel.Id))
                     {
-                        channel.Id = channelIdPrefix + urlHash + line.GetMD5().ToString("N");
+                        channel.Id = channelIdPrefix + line.GetMD5().ToString("N");
                     }
                     else
                     {
-                        channel.Id = channelIdPrefix + urlHash + channel.Id.GetMD5().ToString("N");
+                        channel.Id = channelIdPrefix + channel.Id.GetMD5().ToString("N");
                     }
 
                     channel.Path = line;
@@ -111,6 +107,7 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                     extInf = "";
                 }
             }
+
             return channels;
         }
 
@@ -134,9 +131,26 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
             channel.Name = GetChannelName(extInf, attributes);
             channel.Number = GetChannelNumber(extInf, attributes, mediaUrl);
 
-            if (attributes.TryGetValue("tvg-id", out value))
+            string tvgId;
+            attributes.TryGetValue("tvg-id", out tvgId);
+
+            string channelId;
+            attributes.TryGetValue("channel-id", out channelId);
+
+            channel.TunerChannelId = string.IsNullOrWhiteSpace(tvgId) ? channelId : tvgId;
+
+            var channelIdValues = new List<string>();
+            if (!string.IsNullOrWhiteSpace(channelId))
             {
-                channel.Id = value;
+                channelIdValues.Add(channelId);
+            }
+            if (!string.IsNullOrWhiteSpace(tvgId))
+            {
+                channelIdValues.Add(tvgId);
+            }
+            if (channelIdValues.Count > 0)
+            {
+                channel.Id = string.Join("_", channelIdValues.ToArray());
             }
 
             return channel;
@@ -172,9 +186,7 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                 numberString = numberString.Trim();
             }
 
-            if (string.IsNullOrWhiteSpace(numberString) ||
-                string.Equals(numberString, "-1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(numberString, "0", StringComparison.OrdinalIgnoreCase))
+            if (!IsValidChannelNumber(numberString))
             {
                 string value;
                 if (attributes.TryGetValue("tvg-id", out value))
@@ -192,9 +204,7 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                 numberString = numberString.Trim();
             }
 
-            if (string.IsNullOrWhiteSpace(numberString) ||
-                string.Equals(numberString, "-1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(numberString, "0", StringComparison.OrdinalIgnoreCase))
+            if (!IsValidChannelNumber(numberString))
             {
                 string value;
                 if (attributes.TryGetValue("channel-id", out value))
@@ -208,9 +218,7 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                 numberString = numberString.Trim();
             }
 
-            if (string.IsNullOrWhiteSpace(numberString) ||
-                string.Equals(numberString, "-1", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(numberString, "0", StringComparison.OrdinalIgnoreCase))
+            if (!IsValidChannelNumber(numberString))
             {
                 numberString = null;
             }
@@ -223,17 +231,42 @@ namespace Emby.Server.Implementations.LiveTv.TunerHosts
                 }
                 else
                 {
-                    numberString = Path.GetFileNameWithoutExtension(mediaUrl.Split('/').Last());
-
-                    double value;
-                    if (!double.TryParse(numberString, NumberStyles.Any, CultureInfo.InvariantCulture, out value))
+                    try
                     {
+                        numberString = Path.GetFileNameWithoutExtension(mediaUrl.Split('/').Last());
+
+                        if (!IsValidChannelNumber(numberString))
+                        {
+                            numberString = null;
+                        }
+                    }
+                    catch
+                    {
+                        // Seeing occasional argument exception here
                         numberString = null;
                     }
                 }
             }
 
             return numberString;
+        }
+
+        private bool IsValidChannelNumber(string numberString)
+        {
+            if (string.IsNullOrWhiteSpace(numberString) ||
+                string.Equals(numberString, "-1", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(numberString, "0", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            double value;
+            if (!double.TryParse(numberString, NumberStyles.Any, CultureInfo.InvariantCulture, out value))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private string GetChannelName(string extInf, Dictionary<string, string> attributes)

@@ -3,7 +3,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Providers;
 using System.Threading;
-using MediaBrowser.Common.IO;
+
 using MediaBrowser.Controller.IO;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
@@ -62,17 +62,10 @@ namespace MediaBrowser.Api
 
             var options = GetRefreshOptions(request);
 
-            if (item is Folder)
-            {
-                _providerManager.QueueRefresh(item.Id, options);
-            }
-            else
-            {
-                _providerManager.RefreshFullItem(item, options, CancellationToken.None);
-            }
+            _providerManager.QueueRefresh(item.Id, options, RefreshPriority.High);
         }
 
-        private MetadataRefreshOptions GetRefreshOptions(BaseRefreshRequest request)
+        private MetadataRefreshOptions GetRefreshOptions(RefreshItem request)
         {
             return new MetadataRefreshOptions(new DirectoryService(_logger, _fileSystem))
             {
@@ -80,8 +73,9 @@ namespace MediaBrowser.Api
                 ImageRefreshMode = request.ImageRefreshMode,
                 ReplaceAllImages = request.ReplaceAllImages,
                 ReplaceAllMetadata = request.ReplaceAllMetadata,
-                ForceSave = true,
-                IsAutomated = false
+                ForceSave = request.MetadataRefreshMode == MetadataRefreshMode.FullRefresh || request.ImageRefreshMode == ImageRefreshMode.FullRefresh || request.ReplaceAllImages || request.ReplaceAllMetadata,
+                IsAutomated = false,
+                ValidateChildren = request.Recursive
             };
         }
     }
